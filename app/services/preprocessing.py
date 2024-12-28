@@ -1,51 +1,47 @@
 import cv2
 import numpy as np
-
+from typing import Optional, Tuple, List
+from app.config import PreConfig
 
 class Preprocessing:
     def __init__(self):
         pass
 
-    def preprocess(self, image, config):
+    def preprocess(self, image: np.ndarray, config: PreConfig) -> np.ndarray:
+        # Resize
+        if config.target_size:
+            image = cv2.resize(image, config.target_size)
 
-        if config.resize:
-            print(f"Resizing image to: {config.resize}")  # Debug
-            target_size = tuple(config.resize)
-            image = cv2.resize(image, target_size)
-            print(f"Image shape after resize: {image.shape}")  # Debug
+        # Crop
+        if config.crop_size and config.crop_position:
+            crop_width, crop_height = config.crop_size
+            x, y = config.crop_position
 
-        # Crop operation (if "crop" key exists)
-        if config.crop:
-            crop_size = tuple(config["crop_size"])  # (width, height)
-            position = config[
-                "position"
-            ]  # Position (top-left) for cropping, e.g., (x, y)
-            x, y = position
-            image = image[y : y + crop_size[1], x : x + crop_size[0]]
+            # Validate crop dimensions
+            if (x + crop_width > image.shape[1]) or (y + crop_height > image.shape[0]):
+                raise ValueError("Crop size exceeds image dimensions.")
 
-        # Rotation operation (if "rotate" key exists)
-        if config.rotate:
-            angle = config["rotate"]
-            # Get the image center and rotation matrix
+            image = image[y:y + crop_height, x:x + crop_width]
+
+        # Rotation
+        if config.rotation_angle is not None:
             center = (image.shape[1] // 2, image.shape[0] // 2)
-            matrix = cv2.getRotationMatrix2D(center, angle, 1)
-            image = cv2.warpAffine(image, matrix, (image.shape[1], image.shape[0]))
+            rotation_matrix = cv2.getRotationMatrix2D(center, config.rotation_angle, 1.0)
+            image = cv2.warpAffine(image, rotation_matrix, (image.shape[1], image.shape[0]))
 
-        # Flipping operation (if "flip" key exists)
-        if config.flip:
-            flip_direction = config[
-                "flip"
-            ]  # 0 for vertical flip, 1 for horizontal flip
-            image = cv2.flip(image, flip_direction)
+        # Flipping
+        if config.flip_direction is not None:
+            if config.flip_direction not in [0, 1, -1]:
+                raise ValueError("Invalid flip direction. Use 0 (vertical), 1 (horizontal), or -1 (both).")
+            image = cv2.flip(image, config.flip_direction)
 
-        # Perspective Transformation operation (if "perspective" key exists)
-        if config.perspective:
-            src_points = np.float32(
-                config["perspective"]["src_points"]
-            )  # source points
-            dst_points = np.float32(
-                config["perspective"]["dst_points"]
-            )  # destination points
+        # Perspective Transformation
+        if config.perspective_src_points and config.perspective_dst_points:
+            if len(config.perspective_src_points) != 4 or len(config.perspective_dst_points) != 4:
+                raise ValueError("Perspective transformation requires exactly 4 source and 4 destination points.")
+
+            src_points = np.array(config.perspective_src_points, dtype=np.float32)
+            dst_points = np.array(config.perspective_dst_points, dtype=np.float32)
             matrix = cv2.getPerspectiveTransform(src_points, dst_points)
             image = cv2.warpPerspective(image, matrix, (image.shape[1], image.shape[0]))
 
