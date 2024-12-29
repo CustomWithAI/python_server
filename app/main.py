@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import JSONResponse
+from fastapi.responses import StreamingResponse
 import io
 from PIL import Image
 import numpy as np
@@ -33,9 +34,4 @@ async def preprocessing(image: UploadFile = File(...), config: str = Form(...)):
     # Convert processed image to streamable format
     _, buffer = cv2.imencode(".jpg", processed_image)
     image_stream = io.BytesIO(buffer)
-
-    # Convert image to Base64
-    image_base64 = base64.b64encode(image_stream.getvalue()).decode("utf-8")
-
-    # Return Base64 encoded image as JSON
-    return JSONResponse(content={"image_base64": image_base64})
+    return StreamingResponse(image_stream, media_type="image/jpeg")
