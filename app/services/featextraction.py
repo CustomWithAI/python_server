@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
-from typing import Optional, Tuple, List
+from typing import Dict
+from skimage.feature import hog
 
 class FeatureExtraction:
     def __init__(self):
@@ -10,67 +11,82 @@ class FeatureExtraction:
         if image is None or image.size == 0:
             raise ValueError("Input image is empty or None.")
 
-        """
-        Feature Extractions
-        """
-        features = None
+        # Initialize the features dictionary
+        features = {}
 
+        # Loop through the config to check which feature extraction methods to apply
         for key, value in config.items():
+            # HOG Feature Extraction
             if key == 'hog':
+                gray_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
                 cell_size = value[0]
                 block_size = value[1]
                 orientations = value[2]
 
-                hog = cv2.HOGDescriptor(
-                    _winSize=(image.shape[1] // cell_size[1] * cell_size[1],
-                              image.shape[0] // cell_size[0] * cell_size[0]),
-                    _blockSize=(block_size[1] * cell_size[1], block_size[0] * cell_size[0]),
-                    _blockStride=(cell_size[1], cell_size[0]),
-                    _cellSize=(cell_size[1], cell_size[0]),
-                    _nbins=orientations
+                # Extract HOG features
+                hog_features, _ = hog(
+                    gray_image,
+                    orientations=orientations,
+                    pixels_per_cell=cell_size,
+                    cells_per_block=block_size,
+                    visualize=True,
                 )
-                features = hog.compute(image)
 
-            # elif key == 'sift':
-            #     n_features = params.get('n_features', 500)
-            #     contrast_threshold = params.get('contrast_threshold', 0.04)
-            #     edge_threshold = params.get('edge_threshold', 10)
+                # Store and print HOG features
+                features['hog'] = hog_features
 
-            #     sift = cv2.SIFT_create(nfeatures=n_features, contrastThreshold=contrast_threshold,
-            #                            edgeThreshold=edge_threshold)
-            #     keypoints, features = sift.detectAndCompute(image, None)
 
+            # SIFT Feature Extraction
+            elif key == 'sift':
+                sift = cv2.SIFT_create(
+                    nfeatures=value[0],
+                    contrastThreshold=value[1],
+                    edgeThreshold=value[2]
+                )
+                gray_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+                _, descriptors = sift.detectAndCompute(gray_image, None)
+                features['sift'] = descriptors.flatten() if descriptors is not None else np.array([])
+
+            # # SURF Feature Extraction
             # elif key == 'surf':
-            #     hessian_threshold = params.get('hessian_threshold', 400)
-            #     n_octaves = params.get('n_octaves', 4)
-            #     n_octave_layers = params.get('n_octave_layers', 3)
+            #     surf = cv2.xfeatures2d.SURF_create(
+            #         hessianThreshold=value[0],
+            #         nOctaves=value[1],
+            #         nOctaveLayers=value[2]
+            #     )
+            #     gray_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+            #     _, descriptors = surf.detectAndCompute(gray_image, None)
+            #     features['surf'] = descriptors.flatten() if descriptors is not None else np.array([])
 
-            #     surf = cv2.SURF_create(hessianThreshold=hessian_threshold, nOctaves=n_octaves,
-            #                            nOctaveLayers=n_octave_layers)
-            #     keypoints, features = surf.detectAndCompute(image, None)
+            # ORB Feature Extraction
+            elif key == 'orb':
+                orb = cv2.ORB_create(
+                    nfeatures=value[0],  # Number of keypoints
+                    scaleFactor=value[1],  # Scale factor for pyramid
+                    nlevels=value[2]  # Number of levels in pyramid
+                )
+                gray_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+                _, descriptors = orb.detectAndCompute(gray_image, None)
+                features['orb'] = descriptors.flatten() if descriptors is not None else np.array([])
 
-        return features
+        # Combine features into a single vector
+        combined_features = np.concatenate(
+            [features.get('hog', np.array([])),
+             features.get('sift', np.array([])),
+            #  features.get('surf', np.array([])),
+             features.get('orb', np.array([]))],
+            axis=0
+        )
 
-    # def select_features(self, features: np.ndarray, config: Dict[str, Any]) -> np.ndarray:
-    #     """
-    #     Select features from the provided feature matrix based on the configuration.
-    #     """
-    #     for key, params in config.items():
-    #         if key == 'pca':
-    #             n_components = params.get('n_components', None)
-    #             whiten = params.get('whiten', False)
+        # print("Range Extract = ",len(features['hog']))
+        # print("Sample : ",features['hog'])
 
-    #             pca = PCA(n_components=n_components, whiten=whiten)
-    #             features = pca.fit_transform(features)
+        # print("Range Extract = ",len(features['sift']))
+        # print("Sample : ",features['sift'])
 
-    #         elif key == 'lda':
-    #             n_components = params.get('n_components', None)
-    #             lda = LDA(n_components=n_components)
-    #             features = lda.fit_transform(features, params['labels'])
-
-    #         elif key == 'ica':
-    #             n_components = params.get('n_components', None)
-    #             ica = FastICA(n_components=n_components)
-    #             features = ica.fit_transform(features)
-
-    #     return features
+        # print("Range Extract = ",len(features['orb']))
+        # print("Sample : ",features['orb'])
+        
+        print("Shape :", combined_features.shape)
+        print("Sample : ",combined_features)
+        return combined_features

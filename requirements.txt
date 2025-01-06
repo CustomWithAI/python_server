@@ -2,5 +2,7 @@ numpy
 fastapi
 uvicorn
 pillow
-opencv-python
+opencv-contrib-python
 python-multipart
+scikit-learn
+scikit-image
