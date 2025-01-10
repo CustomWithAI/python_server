@@ -15,7 +15,6 @@ class Augmentation:
         if image is None or image.size == 0:
             raise ValueError("Input image is empty or None.")
         
-        augmented_image = image.copy()
 
         for key, value in config.items():
             print(f"{key}: {value}")
@@ -25,36 +24,36 @@ class Augmentation:
             '''
             if key == 'rotate':
                 if random.random() < value[0]:  # Probability
-                    rows, cols = augmented_image.shape[:2]
+                    rows, cols = image.shape[:2]
                     angle = random.uniform(-value[1], value[1])  # Angle range
                     matrix = cv2.getRotationMatrix2D((cols / 2, rows / 2), angle, 1)
-                    augmented_image = cv2.warpAffine(augmented_image, matrix, (cols, rows))
+                    image = cv2.warpAffine(image, matrix, (cols, rows))
 
             if key == 'crop':
                 if random.random() < value[0]:  # Probability
                     x, y, w, h = value[1]  # Crop parameters
-                    augmented_image = augmented_image[y:y + h, x:x + w]
+                    image = image[y:y + h, x:x + w]
 
             if key == 'flip':
                 if random.random() < value[0]:  # Probability
                     direction = value[1]  # 0 = vertical, 1 = horizontal, -1 = both
-                    augmented_image = cv2.flip(augmented_image, direction)
+                    image = cv2.flip(image, direction)
 
             if key == 'translate':
                 if random.random() < value[0]:  # Probability
-                    rows, cols = augmented_image.shape[:2]
+                    rows, cols = image.shape[:2]
                     tx, ty = value[1]  # Shift range (x, y)
                     matrix = np.float32([[1, 0, tx], [0, 1, ty]])
-                    augmented_image = cv2.warpAffine(augmented_image, matrix, (cols, rows))
+                    image = cv2.warpAffine(image, matrix, (cols, rows))
 
             if key == 'scale':
                 if random.random() < value[0]:  # Probability
                     fx, fy = value[1]  # Scaling factors
-                    augmented_image = cv2.resize(augmented_image, None, fx=fx, fy=fy, interpolation=cv2.INTER_LINEAR)
+                    image = cv2.resize(image, None, fx=fx, fy=fy, interpolation=cv2.INTER_LINEAR)
 
             if key == 'grayscale':
                 if random.random() < value[0]:  # Probability
-                    augmented_image = cv2.cvtColor(augmented_image, cv2.COLOR_BGR2GRAY)
+                    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
             '''
             Color and Intensity Adjustments
@@ -62,50 +61,50 @@ class Augmentation:
             if key == 'brightness':
                 if random.random() < value[0]:
                     factor = random.uniform(-value[1], value[1])
-                    augmented_image = cv2.convertScaleAbs(augmented_image, alpha=1, beta=factor * 255)
+                    image = cv2.convertScaleAbs(image, alpha=1, beta=factor * 255)
 
             if key == 'contrast_stretching':
                 if random.random() < value[0]:
                     lower, upper = value[1]
                     in_range = (lower * 255, upper * 255)
-                    augmented_image = cv2.normalize(augmented_image, None, alpha=in_range[0], beta=in_range[1], norm_type=cv2.NORM_MINMAX)
+                    image = cv2.normalize(image, None, alpha=in_range[0], beta=in_range[1], norm_type=cv2.NORM_MINMAX)
 
             if key == 'hist_equalization':
                 if random.random() < value[0]:
-                    if len(augmented_image.shape) == 2:  # Grayscale image
-                        augmented_image = cv2.equalizeHist(augmented_image)
+                    if len(image.shape) == 2:  # Grayscale image
+                        image = cv2.equalizeHist(image)
                     else:
                         for i in range(3):  # Equalize each channel
-                            augmented_image[:, :, i] = cv2.equalizeHist(augmented_image[:, :, i])
+                            image[:, :, i] = cv2.equalizeHist(image[:, :, i])
 
             if key == 'adaptive_equalization':
                 if random.random() < value[0]:
                     clip_limit = value[1]
                     clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(8, 8))
-                    if len(augmented_image.shape) == 2:  # Grayscale
-                        augmented_image = clahe.apply(augmented_image)
+                    if len(image.shape) == 2:  # Grayscale
+                        image = clahe.apply(image)
                     else:
                         for i in range(3):
-                            augmented_image[:, :, i] = clahe.apply(augmented_image[:, :, i])
+                            image[:, :, i] = clahe.apply(image[:, :, i])
 
             if key == 'saturation':
                 if random.random() < value[0]:
-                    hsv = cv2.cvtColor(augmented_image, cv2.COLOR_BGR2HSV)
+                    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
                     hsv[:, :, 1] = cv2.multiply(hsv[:, :, 1], value[1])
-                    augmented_image = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+                    image = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
             if key == 'hue':
                 if random.random() < value[0]:
-                    hsv = cv2.cvtColor(augmented_image, cv2.COLOR_BGR2HSV)
+                    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
                     hsv[:, :, 0] = cv2.add(hsv[:, :, 0], value[1])
-                    augmented_image = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+                    image = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
             if key == 'gamma':
                 if random.random() < value[0]:
                     gamma = value[1]
                     inv_gamma = 1.0 / gamma
                     table = np.array([(i / 255.0) ** inv_gamma * 255 for i in range(256)]).astype("uint8")
-                    augmented_image = cv2.LUT(augmented_image, table)
+                    image = cv2.LUT(image, table)
 
             '''
             Blurring and Sharpening
@@ -113,7 +112,7 @@ class Augmentation:
             if key == 'gaussian_blur':
                 if random.random() < value[0]:
                     kernel_size, sigma = value[1]
-                    augmented_image = cv2.GaussianBlur(augmented_image, (kernel_size, kernel_size), sigma)
+                    image = cv2.GaussianBlur(image, (kernel_size, kernel_size), sigma)
 
             if key == 'motion_blur':
                 if random.random() < value[0]:
@@ -123,16 +122,16 @@ class Augmentation:
                     matrix = cv2.getRotationMatrix2D((kernel_size / 2, kernel_size / 2), angle, 1)
                     kernel = cv2.warpAffine(kernel, matrix, (kernel_size, kernel_size))
                     kernel = kernel / kernel.sum()
-                    augmented_image = cv2.filter2D(augmented_image, -1, kernel)
+                    image = cv2.filter2D(image, -1, kernel)
 
             if key == 'zoom_blur':
                 if random.random() < value[0]:
                     zoom_factor = value[1]
-                    center = tuple(np.array(augmented_image.shape[:2][::-1]) / 2)
-                    original_size = augmented_image.shape[:2][::-1]
+                    center = tuple(np.array(image.shape[:2][::-1]) / 2)
+                    original_size = image.shape[:2][::-1]
                     for i in range(1, zoom_factor):
                         scale_factor = 1 - i * 0.1
-                        temp = cv2.resize(augmented_image, None, fx=scale_factor, fy=scale_factor)
+                        temp = cv2.resize(image, None, fx=scale_factor, fy=scale_factor)
                         new_size = temp.shape[:2][::-1]
                         
                         # Calculate margins to crop to the original size
@@ -146,16 +145,16 @@ class Augmentation:
                         elif delta_h > 0:
                             temp = temp[delta_h:-delta_h, :]
                         
-                        # Ensure temp and augmented_image have the same size
+                        # Ensure temp and image have the same size
                         temp = cv2.resize(temp, original_size)
 
-                        augmented_image = cv2.addWeighted(augmented_image, 0.5, temp, 0.5, 0)
+                        image = cv2.addWeighted(image, 0.5, temp, 0.5, 0)
 
             if key == 'sharpening':
                 if random.random() < value[0]:
                     factor = value[1]
                     kernel = np.array([[0, -factor, 0], [-factor, 1 + 4 * factor, -factor], [0, -factor, 0]])
-                    augmented_image = cv2.filter2D(augmented_image, -1, kernel)
+                    image = cv2.filter2D(image, -1, kernel)
 
             '''
             Noise Injection
@@ -163,20 +162,20 @@ class Augmentation:
             if key == 'gaussian_noise':
                 if random.random() < value[0]:
                     mean, var = value[1]
-                    noise = np.random.normal(mean, var ** 0.5, augmented_image.shape)
-                    augmented_image = cv2.add(augmented_image, noise.astype('uint8'))
+                    noise = np.random.normal(mean, var ** 0.5, image.shape)
+                    image = cv2.add(image, noise.astype('uint8'))
 
             if key == 'salt_pepper_noise':
                 if random.random() < value[0]:
                     amount, s_vs_p = value[1]
-                    noisy = augmented_image.copy()
-                    num_salt = np.ceil(amount * augmented_image.size * s_vs_p)
-                    coords = [np.random.randint(0, i - 1, int(num_salt)) for i in augmented_image.shape]
+                    noisy = image.copy()
+                    num_salt = np.ceil(amount * image.size * s_vs_p)
+                    coords = [np.random.randint(0, i - 1, int(num_salt)) for i in image.shape]
                     noisy[tuple(coords)] = 255
-                    num_pepper = np.ceil(amount * augmented_image.size * (1. - s_vs_p))
-                    coords = [np.random.randint(0, i - 1, int(num_pepper)) for i in augmented_image.shape]
+                    num_pepper = np.ceil(amount * image.size * (1. - s_vs_p))
+                    coords = [np.random.randint(0, i - 1, int(num_pepper)) for i in image.shape]
                     noisy[tuple(coords)] = 0
-                    augmented_image = noisy
+                    image = noisy
 
             '''
             Random Erasing
@@ -184,7 +183,7 @@ class Augmentation:
             if key == 'random_erasing':
                 if random.random() < value[0]:
                     x, y, w, h = value[1]
-                    augmented_image[y:y + h, x:x + w] = np.random.randint(0, 256, (h, w, 3), dtype=np.uint8)
+                    image[y:y + h, x:x + w] = np.random.randint(0, 256, (h, w, 3), dtype=np.uint8)
 
             '''
             Elastic Transformation
@@ -206,6 +205,6 @@ class Augmentation:
                     map_y = (y + dy).astype('float32')
 
                     # Remap the image
-                    augmented_image = cv2.remap(image, map_x, map_y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101)
+                    image = cv2.remap(image, map_x, map_y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101)
 
-        return augmented_image
+        return image

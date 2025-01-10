@@ -1,87 +1,69 @@
-from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.responses import JSONResponse
-from fastapi.responses import StreamingResponse
-import io
-from PIL import Image
-import numpy as np
-import cv2
+from fastapi import FastAPI, Form
 import json
-import base64
-from app.services.preprocessing import Preprocessing
-from app.services.featextraction import FeatureExtraction
-from app.services.featselection import FeatureSelection
-from app.services.augmentation import Augmentation
-from app.services.hog_pca import compute_hog_features
+import os
+import glob
+from app.services.dataset.dataset import preprocess_all_dataset,augment_dataset
 app = FastAPI()
-preprocess = Preprocessing()
-featextraction = FeatureExtraction()
-featselection = FeatureSelection()
-augmentation = Augmentation()
 
 @app.get("/")
 async def status():
     return {"message": "server is running"}
 
-@app.post("/preprocess")
-async def preprocessing(image: UploadFile = File(...), config: str = Form(...)):
-    # Parse JSON string into a PreConfig object
-    config_data = json.loads(config)
+'''
+{
+    "preprocess": {...},
+    "feature_extraction": {...},
+    "selection": {...},
+    "augmentations": {...},
+    ...
+}
+'''
+@app.post("/training")
+async def training(config: str = Form(...)):
+    pass
 
-    # Read and convert image to RGB first
-    image_bytes = await image.read()
-    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
-
-    # Apply preprocessing
-    processed_image = preprocess.preprocess(image, config_data)
-
-    # Convert processed image to streamable format
-    _, buffer = cv2.imencode(".jpg", processed_image)
-    image_stream = io.BytesIO(buffer)
-    return StreamingResponse(image_stream, media_type="image/jpeg")
-
-@app.post("/featextract")
-async def featextract(image: UploadFile = File(...), config: str = Form(...)):
-    # Parse JSON string into a PreConfig object
-    config_data = json.loads(config)
-
-    # Read and convert image to RGB first
-    image_bytes = await image.read()
-    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-
-    # Apply preprocessing
-    feature = featextraction.extract_features(image, config_data)
-
-    # return feature
-
-@app.post("/featselect")
-async def featselect(image: UploadFile = File(...), config: str = Form(...)):
-    feature = compute_hog_features()
-
-    # Parse JSON string into a PreConfig object
-    config_data = json.loads(config)
-
-    # Apply preprocessing
-    feature = featselection.select_features(feature, config_data)
-
-    # return feature
+@app.post("/dataset")
+async def prepare_dataset(config: str = Form(...)):
+    all_config = json.loads(config)
+    config_preprocess = all_config["preprocess"]
+    # config_featextraction = all_config["feature_extraction"]
+    # config_featselection = all_config["feature_selection"]
+    config_augmentation = all_config["augmentation"]
 
 
-@app.post("/augmentation")
-async def augmentation_func(image: UploadFile = File(...), config: str = Form(...)):
-    # Parse JSON string into a PreConfig object
-    config_data = json.loads(config)
+    # TODO: Get dataset
 
-    # Read and convert image to RGB first
-    image_bytes = await image.read()
-    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    image = cv2.cvtColor(np.array(image), cv2.COLOR_BGR2RGB)
+    # TODO: Preprocess images
+    if config_preprocess != {}:
+        dataset_dir = 'dataset'
+        preprocess_all_dataset(dataset_dir, config_preprocess)
 
-    # Apply preprocessing
-    augmented_img = augmentation.augmentation(image, config_data)
+    
+    # TODO: Augmentation
+    if config_augmentation != {}:
+        training_path = 'dataset/train'
 
-    # Convert processed image to streamable format
-    _, buffer = cv2.imencode(".jpg", augmented_img)
-    image_stream = io.BytesIO(buffer)
-    return StreamingResponse(image_stream, media_type="image/jpeg")
+        # Count how many training dataset exist
+        image_extensions = ['*.png', '*.jpg']
+        image_count = 0
+        for ext in image_extensions:
+            image_count += len(glob.glob(os.path.join(training_path, '**', ext), recursive=True))
+        
+        # Calculate target number per class
+        total_target_number = config_augmentation["number"] - image_count
+
+        # Do Augmentation
+        if total_target_number > 0:
+            augment_dataset(training_path, config_augmentation["number"], config_augmentation)
+
+    # # TODO: Feature Extraction
+    # if config_featextraction != {}:
+    #     for image in dataset:
+    #         image = feature_extraction(image, config_featextraction)
+
+    # # TODO: Feature Selection
+    # if config_featselection != {}:
+    #     for image in dataset:
+    #         image = feature_selection(image, config_featextraction)
+    pass
+

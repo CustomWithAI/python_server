@@ -24,7 +24,7 @@ class Preprocessing:
                 image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
             # Resize
-            if key=='target_size':
+            if key=='resize':
                 image = cv2.resize(image, value)
 
             # Crop

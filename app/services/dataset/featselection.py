@@ -24,13 +24,23 @@ class FeatureSelection:
 
             # LDA Feature Selection
             if key == 'lda':
-                lda = LDA(n_components=value[0])
-                selected_features['lda'] = lda.fit_transform(data, value[1])
+                labels=[]
+                # Convert to a 2D array
+                hog_features_array = np.vstack(data)  # Stack vertically to ensure consistency
+                labels_array = np.array(labels)  # Convert labels list to a numpy array
 
-            # # ICA Feature Selection
-            # elif key == 'ica':
-            #     ica = FastICA(n_components=value)
-            #     selected_features['ica'] = ica.fit_transform(data)
+                # Apply LDA
+                lda = LDA()
+                selected_features['lda'] = lda.fit_transform(hog_features_array, labels_array)
+
+            # ICA Feature Selection
+            elif key == 'ica':
+                hog_features_array = np.vstack(data)  # Stack vertically to ensure consistency
+
+                # Apply ICA
+                n_components = min(hog_features_array.shape[0], hog_features_array.shape[1])  # Number of components
+                ica = FastICA(n_components=n_components, random_state=0)
+                selected_features['ica'] = ica.fit_transform(hog_features_array)
 
         # Combine features into a single vector
         combined_features = np.concatenate(
