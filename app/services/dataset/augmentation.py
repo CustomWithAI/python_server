@@ -15,6 +15,8 @@ class Augmentation:
         if image is None or image.size == 0:
             raise ValueError("Input image is empty or None.")
         
+        # Check if the original image is grayscale
+        is_grayscale = (len(image.shape) == 2) or (len(image.shape) == 3 and image.shape[2] == 1)
 
         for key, value in config.items():
             print(f"{key}: {value}")
@@ -206,5 +208,8 @@ class Augmentation:
 
                     # Remap the image
                     image = cv2.remap(image, map_x, map_y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101)
+
+            if is_grayscale and len(image.shape) == 3:
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
         return image

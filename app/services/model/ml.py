@@ -9,7 +9,7 @@ class MlModel:
     def __init__(self):
         pass
 
-    def create_ml_model(self, image: np.ndarray, config: dict) -> Optional:
+    def create_ml_model(self,config):
         model = None
 
         if "decision_trees" in config:

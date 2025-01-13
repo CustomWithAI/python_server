@@ -8,7 +8,7 @@ class Preprocessing:
 
     def preprocess(self, image: np.ndarray, config) -> np.ndarray:
         for key, value in config.items():
-            print(f"{key}: {value}")
+            # print(f"{key}: {value}")
 
             '''
             Validate input image

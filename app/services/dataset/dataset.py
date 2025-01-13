@@ -19,7 +19,7 @@ def preprocess_all_dataset(dataset_dir,config_preprocess):
                         image = preprocess.preprocess(image, config_preprocess)
                         # Save the resized image back to the same file path
                         cv2.imwrite(file_path, image)
-                        print(f"Saved: {file_path}")
+                        # print(f"Saved: {file_path}")
                     else:
                         print(f"Failed to read image: {file_path}")
                 except Exception as e:

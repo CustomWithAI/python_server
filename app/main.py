@@ -3,6 +3,8 @@ import json
 import os
 import glob
 from app.services.dataset.dataset import preprocess_all_dataset,augment_dataset
+from app.services.model.training import training
+
 app = FastAPI()
 
 @app.get("/")
@@ -18,9 +20,12 @@ async def status():
     ...
 }
 '''
-@app.post("/training")
-async def training(config: str = Form(...)):
-    pass
+@app.post("/training-ml")
+async def training_ml(config: str = Form(...)):
+    config_dict = json.loads(config)
+    print(config)
+    training(config_dict)
+
 
 @app.post("/dataset")
 async def prepare_dataset(config: str = Form(...)):
@@ -35,12 +40,14 @@ async def prepare_dataset(config: str = Form(...)):
 
     # TODO: Preprocess images
     if config_preprocess != {}:
+        print("DOING PREPROCESS")
         dataset_dir = 'dataset'
         preprocess_all_dataset(dataset_dir, config_preprocess)
 
     
     # TODO: Augmentation
     if config_augmentation != {}:
+        print("DOING AUGMENTATION")
         training_path = 'dataset/train'
 
         # Count how many training dataset exist
