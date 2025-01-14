@@ -2,3 +2,5 @@
 *.jpg
 *.png
 *.DS_Store
+*.txt
+*.labels

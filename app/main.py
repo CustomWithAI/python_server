@@ -2,7 +2,7 @@ from fastapi import FastAPI, Form
 import json
 import os
 import glob
-from app.services.dataset.dataset import preprocess_all_dataset,augment_dataset
+from app.services.dataset.dataset import preprocess_all_dataset,augment_dataset_class,augment_dataset_obj
 from app.services.model.training import training
 
 app = FastAPI()
@@ -13,6 +13,7 @@ async def status():
 
 '''
 {
+    "type": "classification",
     "preprocess": {...},
     "feature_extraction": {...},
     "selection": {...},
@@ -30,6 +31,7 @@ async def training_ml(config: str = Form(...)):
 @app.post("/dataset")
 async def prepare_dataset(config: str = Form(...)):
     all_config = json.loads(config)
+    config_type = all_config['type']
     config_preprocess = all_config["preprocess"]
     # config_featextraction = all_config["feature_extraction"]
     # config_featselection = all_config["feature_selection"]
@@ -56,12 +58,16 @@ async def prepare_dataset(config: str = Form(...)):
         for ext in image_extensions:
             image_count += len(glob.glob(os.path.join(training_path, '**', ext), recursive=True))
         
-        # Calculate target number per class
         total_target_number = config_augmentation["number"] - image_count
+        print("TOTAL TARGER:", total_target_number)
 
         # Do Augmentation
         if total_target_number > 0:
-            augment_dataset(training_path, config_augmentation["number"], config_augmentation)
+            if config_type == "classification":
+                augment_dataset_class(training_path, config_augmentation["number"], config_augmentation)
+            if config_type == "object_detection":
+                augment_dataset_obj(training_path, config_augmentation["number"],config_augmentation)
+
 
     # # TODO: Feature Extraction
     # if config_featextraction != {}:
