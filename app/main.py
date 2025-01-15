@@ -3,10 +3,11 @@ import json
 import os
 import glob
 from app.services.dataset.dataset import preprocess_all_dataset,augment_dataset_class,augment_dataset_obj
-from app.services.model.training import training
+from app.services.model.training import MLTraining,DLTrainingPretrained
+mltraining = MLTraining()
+dltrainingpretrain = DLTrainingPretrained()
 
 app = FastAPI()
-
 @app.get("/")
 async def status():
     return {"message": "server is running"}
@@ -25,8 +26,15 @@ async def status():
 async def training_ml(config: str = Form(...)):
     config_dict = json.loads(config)
     print(config)
-    training(config_dict)
+    mltraining.training_ml(config_dict)
 
+@app.post("/training-dl-pretrained")
+async def training_dl(config: str = Form(...)):
+    config_dict = json.loads(config)
+    config_model = config_dict['model']
+    config_training = config_dict['training']
+    print(config)
+    DLTrainingPretrained.train(config_model,config_training)
 
 @app.post("/dataset")
 async def prepare_dataset(config: str = Form(...)):

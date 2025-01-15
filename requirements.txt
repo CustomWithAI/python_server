@@ -6,3 +6,4 @@ opencv-contrib-python
 python-multipart
 scikit-learn
 scikit-image
+tensorflow
