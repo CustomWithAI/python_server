@@ -2,10 +2,13 @@ from fastapi import FastAPI, Form
 import json
 import os
 import glob
+
 from app.services.dataset.dataset import preprocess_all_dataset,augment_dataset_class,augment_dataset_obj
 from app.services.model.training import MLTraining,DLTrainingPretrained
+from app.services.model.construct import ConstructDL
 mltraining = MLTraining()
 dltrainingpretrain = DLTrainingPretrained()
+constructdl = ConstructDL()
 
 app = FastAPI()
 @app.get("/")
@@ -35,6 +38,12 @@ async def training_dl(config: str = Form(...)):
     config_training = config_dict['training']
     print(config)
     DLTrainingPretrained.train(config_model,config_training)
+
+@app.post("/construct")
+async def construct_model(config: str = Form(...)):
+    config_dict = json.loads(config)
+    model = constructdl.construct(config_dict)
+    model.summary()
 
 @app.post("/dataset")
 async def prepare_dataset(config: str = Form(...)):
