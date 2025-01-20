@@ -5,12 +5,13 @@ class ConstructDL(object):
     def __init__(self):
         pass
 
-    def construct(self, config):
+
+    def construct(self, config, input_shape):
         model = models.Sequential()
         for layer_config in config:
-            if "inputLayer_shape" in layer_config and "inputLayer_batchSize" in layer_config:
+            if "inputLayer_batchSize" in layer_config:
                 model.add(layers.InputLayer(
-                    input_shape=eval(layer_config["inputLayer_shape"]),
+                    input_shape=input_shape,  # Directly pass input_shape
                     batch_size=layer_config["inputLayer_batchSize"]
                 ))
 

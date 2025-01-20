@@ -4,11 +4,11 @@ import os
 import glob
 
 from app.services.dataset.dataset import preprocess_all_dataset,augment_dataset_class,augment_dataset_obj
-from app.services.model.training import MLTraining,DLTrainingPretrained
+from app.services.model.training import MLTraining,DLTrainingPretrained,ConstructTraining
 from app.services.model.construct import ConstructDL
 mltraining = MLTraining()
 dltrainingpretrain = DLTrainingPretrained()
-constructdl = ConstructDL()
+constructtraining = ConstructTraining()
 
 app = FastAPI()
 @app.get("/")
@@ -39,11 +39,12 @@ async def training_dl(config: str = Form(...)):
     print(config)
     DLTrainingPretrained.train(config_model,config_training)
 
-@app.post("/construct")
+@app.post("/construct-classification")
 async def construct_model(config: str = Form(...)):
     config_dict = json.loads(config)
-    model = constructdl.construct(config_dict)
-    model.summary()
+    config_model = config_dict['model']
+    config_training = config_dict['training']
+    constructtraining.train(config_model, config_training)
 
 @app.post("/dataset")
 async def prepare_dataset(config: str = Form(...)):

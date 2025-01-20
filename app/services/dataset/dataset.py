@@ -39,7 +39,7 @@ def augment_class_images(class_path, target_number_per_class, config_augmentatio
         random_image_path = random.choice(original_images)  # Select from original images only
         image = cv2.imread(random_image_path)
         if image is not None:
-            augmented_img = augmentation.augmentation(image, config_augmentation)  # Perform your augmentation
+            augmented_img = augmentation.augmentation_classification(image, config_augmentation)  # Perform your augmentation
             # Generate a new filename for the augmented image
             new_filename = f"aug_{random.randint(0, 1e6)}.jpg"
             new_file_path = os.path.join(class_path, new_filename)
@@ -72,8 +72,7 @@ def augment_dataset_obj(folder_path, target_num_images, config_augmentation):
     for image_file, txt_file in zip(image_files, txt_files):
         txt_path = os.path.join(folder_path, txt_file)
         with open(txt_path, 'r') as file:
-            # Assuming each line in the .txt file starts with the class label
-            class_label = file.readline().split()[0]  # Adjust based on your file format
+            class_label = file.readline().split()[0]  # Assuming each line in the .txt file starts with the class label
         class_to_images[class_label].append((image_file, txt_file))
 
     total_current_images = len(image_files)
@@ -87,21 +86,36 @@ def augment_dataset_obj(folder_path, target_num_images, config_augmentation):
     total_classes = len(class_to_images)
     for class_label, images in class_to_images.items():
         current_count = len(images)
-        augmentations_per_class[class_label] = max(0, (num_augmentations_needed * (current_count / total_current_images)))
+        augmentations_per_class[class_label] = max(0, int(num_augmentations_needed * (current_count / total_current_images)))
 
     # Perform augmentations
     for class_label, images in class_to_images.items():
-        needed_augmentations = int(augmentations_per_class[class_label])
+        needed_augmentations = augmentations_per_class[class_label]
         for _ in range(needed_augmentations):
-            # Randomly select an image
+            # Randomly select an image and its corresponding .txt file
             image_file, txt_file = random.choice(images)
 
             # Load the image
             image_path = os.path.join(folder_path, image_file)
             image = cv2.imread(image_path)
 
+            # Load the bounding boxes from the .txt file
+            txt_path = os.path.join(folder_path, txt_file)
+            bounding_box = []
+
+            with open(txt_path, 'r') as file:
+                lines = file.readlines()
+                for line in lines:
+                    values = line.strip().split()
+                    class_id = int(values[0])
+                    x_center = float(values[1])
+                    y_center = float(values[2])
+                    width = float(values[3])
+                    height = float(values[4])
+                    bounding_box.append((class_id, x_center, y_center, width, height))
+
             # Apply augmentation
-            augmented_img = augmentation.augmentation(image, config_augmentation)
+            augmented_img, adjusted_bounding_box = augmentation.augmentation_object_detection(image, config_augmentation, bounding_box)
 
             # Generate a unique suffix
             unique_suffix = random.randint(1000, 9999)
@@ -110,7 +124,9 @@ def augment_dataset_obj(folder_path, target_num_images, config_augmentation):
             augmented_image_path = os.path.join(folder_path, f"aug_{unique_suffix}_{image_file}")
             cv2.imwrite(augmented_image_path, augmented_img)
 
-            # Clone the corresponding .txt file for the bounding box
-            augmented_txt_path = os.path.join(folder_path, f"aug_{unique_suffix}_{txt_file}")
-            original_txt_path = os.path.join(folder_path, txt_file)
-            shutil.copyfile(original_txt_path, augmented_txt_path)
+            # Save the adjusted bounding boxes back to a .txt file with the same name as the image
+            adjusted_txt_path = os.path.join(folder_path, f"aug_{unique_suffix}_{image_file}.txt")
+            with open(adjusted_txt_path, 'w') as file:
+                for box in adjusted_bounding_box:
+                    class_id, x_center, y_center, width, height = box
+                    file.write(f"{class_id} {x_center} {y_center} {width} {height}\n")
