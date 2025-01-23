@@ -7,3 +7,4 @@ python-multipart
 scikit-learn
 scikit-image
 tensorflow
+PyYAML

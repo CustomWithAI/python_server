@@ -2,7 +2,7 @@ from fastapi import FastAPI, Form
 import json
 import os
 import glob
-
+import subprocess
 from app.services.dataset.dataset import preprocess_all_dataset,augment_dataset_class,augment_dataset_obj
 from app.services.model.training import MLTraining,DLTrainingPretrained,ConstructTraining
 from app.services.model.construct import ConstructDL
@@ -37,7 +37,20 @@ async def training_dl(config: str = Form(...)):
     config_model = config_dict['model']
     config_training = config_dict['training']
     print(config)
-    DLTrainingPretrained.train(config_model,config_training)
+    dltrainingpretrain.train(config_model,config_training)
+
+@app.post("/create_yolo_venv")
+async def create_venv():
+    subprocess.run(["python", "-m", "venv", "yolo_venv"], check=True)
+    subprocess.run("bash -c 'source yolo_venv/bin/activate && pip install -r app/services/model/yolov5/requirements.txt'", shell=True, check=True)
+    
+
+@app.post("/training-yolo-pretrained")
+async def training_yolo_pretrained(config: str = Form(...)):
+    config_dict = json.loads(config)
+    config_model = config_dict['model']
+    config_training = config_dict['training']
+    dltrainingpretrain.train_yolo(config_model, config_training)
 
 @app.post("/construct-classification")
 async def construct_model(config: str = Form(...)):

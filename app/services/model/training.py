@@ -2,6 +2,10 @@ import os
 import numpy as np
 import os
 import json
+import subprocess
+import yaml
+import cv2
+import shutil
 from sklearn.metrics import accuracy_score
 from skimage.io import imread
 import tensorflow as tf
@@ -171,6 +175,121 @@ class DLTrainingPretrained():
 
         return images, labels, class_dict, input_shape
 
+    def update_data_yaml(self,data_yaml_path, label_txt_path):
+        # Read the label.txt file
+        with open(label_txt_path, 'r') as file:
+            classes = file.read().splitlines()
+
+        # Read the existing data.yaml
+        with open(data_yaml_path, 'r') as file:
+            data_yaml = yaml.safe_load(file)
+
+        # Update the data.yaml content
+        data_yaml['nc'] = len(classes)
+        data_yaml['names'] = classes
+
+        # Define the desired order and formatting
+        updated_data = {
+            'train': "/app/yolo_dataset/train/images",
+            'val': "/app/yolo_dataset/valid/images",
+            'test': "/app/yolo_dataset/test/images",
+            'nc': data_yaml['nc'],
+            'names': data_yaml['names']
+        }
+
+        # Write the updated content back to data.yaml with the desired format
+        with open(data_yaml_path, 'w') as file:
+            yaml.dump(updated_data, file, default_flow_style=None, sort_keys=False)
+
+        print(f"Updated {data_yaml_path} with {len(classes)} classes in the desired format.")
+
+    def get_image_shape(self,folder_path):
+        # Get a list of all files in the folder
+        file_list = os.listdir(folder_path)
+        
+        # Filter to ensure only image files are considered
+        image_files = [file for file in file_list if file.endswith(('.png', '.jpg', '.jpeg'))]
+        
+        # Check if there are any images in the folder
+        if image_files:
+            # Pick the first image
+            image_path = os.path.join(folder_path, image_files[0])
+            
+            # Load the image using OpenCV
+            img = cv2.imread(image_path)
+            
+            # Return the shape of the image
+            return img.shape[1]
+        else:
+            print("No image files found in the folder!")
+            return None
+    
+    def reformat_dataset(self,source_dir, target_dir):
+        # Define subdirectories in the source dataset and target format
+        data_splits = ["train", "test", "valid"]
+        subdirs = {"image": "images", "labels": "labels"}
+
+        # Create target directory structure
+        for split in data_splits:
+            split_source_dir = os.path.join(source_dir, split)
+            if not os.path.exists(split_source_dir):
+                continue
+            for subdir in subdirs.values():
+                os.makedirs(os.path.join(target_dir, split, subdir), exist_ok=True)
+
+        # Organize files into the target directory structure
+        for split in data_splits:
+            split_source_dir = os.path.join(source_dir, split)
+            if not os.path.exists(split_source_dir):
+                continue
+            split_target_dir = os.path.join(target_dir, split)
+
+            for file in os.listdir(split_source_dir):
+                source_file = os.path.join(split_source_dir, file)
+
+                if file.endswith(".jpg"):
+                    target_subdir = subdirs["image"]
+                elif file.endswith(".txt") and not file.startswith("label"):
+                    target_subdir = subdirs["labels"]
+                else:
+                    continue
+
+                target_file = os.path.join(split_target_dir, target_subdir, file)
+                shutil.copy2(source_file, target_file)
+
+        print("Dataset has been reformatted and cloned to:", target_dir)
+        
+    def train_yolo(self, config_model, config_training):
+        if "yolov5" in config_model:
+            # Clone dataset to the training folder
+            self.reformat_dataset("dataset", "yolo_dataset")
+            
+            # Update data.yaml file
+            self.update_data_yaml("app/services/model/yolov5/data.yaml","dataset/train/label.txt")
+            
+            # Extract config training
+            img_size = self.get_image_shape("./dataset/train/")
+            batch_size = config_training[0]
+            epochs = config_training[1]
+
+            # Training model 
+            command = f"yolo_venv/bin/python ./app/services/model/yolov5/train.py --img {img_size} --batch {batch_size} --epochs {epochs} --data ./app/services/model/yolov5/data.yaml --cache"
+            subprocess.run(command, shell=True, check=True)
+            
+
+
+        if "yolov8" in config_model:
+            # TODO: Implement YOLOv8 training
+            pass
+
+        if "yolov11" in config_model:
+            # TODO: Implement YOLOv11 training
+            pass
+
+        shutil.rmtree("yolo_dataset/train")
+        shutil.rmtree("yolo_dataset/test")
+        shutil.rmtree("yolo_dataset/valid")
+        shutil.rmtree("./app/services/model/yolov5/runs/train")
 
 class ConstructTraining():
     def __init__(self):
