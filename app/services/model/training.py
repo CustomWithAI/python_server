@@ -260,36 +260,49 @@ class DLTrainingPretrained():
         print("Dataset has been reformatted and cloned to:", target_dir)
         
     def train_yolo(self, config_model, config_training):
-        if "yolov5" in config_model:
-            # Clone dataset to the training folder
-            self.reformat_dataset("dataset", "yolo_dataset")
-            
-            # Update data.yaml file
-            self.update_data_yaml("app/services/model/yolov5/data.yaml","dataset/train/label.txt")
-            
-            # Extract config training
-            img_size = self.get_image_shape("./dataset/train/")
-            batch_size = config_training[0]
-            epochs = config_training[1]
+        # Clone dataset to the training folder
+        self.reformat_dataset("dataset", "yolo_dataset")
 
+        # Update data.yaml file
+        self.update_data_yaml("./data.yaml","dataset/train/label.txt")
+        
+        # Extract config training
+        img_size = self.get_image_shape("./dataset/train/")
+        batch_size = config_training[0]
+        epochs = config_training[1]
+        size = config_training[2]
+
+        # shutil.rmtree("./runs")
+
+
+        if "yolov5" in config_model:
             # Training model 
-            command = f"yolo_venv/bin/python ./app/services/model/yolov5/train.py --img {img_size} --batch {batch_size} --epochs {epochs} --data ./app/services/model/yolov5/data.yaml --cache"
+            command = f"yolo5_venv/bin/python ./app/services/model/yolov5/train.py --img {img_size} --batch {batch_size} --epochs {epochs} --data ./data.yaml --weights {size} --cache"
             subprocess.run(command, shell=True, check=True)
-            
+
+            shutil.rmtree("./app/services/model/yolov5/runs/train")
+
 
 
         if "yolov8" in config_model:
+            print("training yolov8")
             # TODO: Implement YOLOv8 training
+            command = f"yolov8_venv/bin/yolo task=detect mode=train model={size} data=./data.yaml epochs={epochs} imgsz={img_size} plots=True"
+            subprocess.run(command, shell=True, check=True)
+
+            # shutil.rmtree("./runs")
+
             pass
 
         if "yolov11" in config_model:
             # TODO: Implement YOLOv11 training
+            command = f"yolov11_venv/bin/yolo task=detect mode=train model={size} data=./data.yaml epochs={epochs} imgsz={img_size} plots=True"
+            subprocess.run(command, shell=True, check=True)
             pass
 
         shutil.rmtree("yolo_dataset/train")
         shutil.rmtree("yolo_dataset/test")
         shutil.rmtree("yolo_dataset/valid")
-        shutil.rmtree("./app/services/model/yolov5/runs/train")
 
 class ConstructTraining():
     def __init__(self):

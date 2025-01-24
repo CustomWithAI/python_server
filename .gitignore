@@ -4,5 +4,12 @@
 *.DS_Store
 *.txt
 *.labels
+*.pt
+*.cache
+*.csv
+args.yaml
 app/services/model/yolov5/
 yolo_venv/
+yolo5_venv/
+yolov8_venv/
+yolov11_venv/

@@ -41,9 +41,20 @@ async def training_dl(config: str = Form(...)):
 
 @app.post("/create_yolo_venv")
 async def create_venv():
-    subprocess.run(["python", "-m", "venv", "yolo_venv"], check=True)
-    subprocess.run("bash -c 'source yolo_venv/bin/activate && pip install -r app/services/model/yolov5/requirements.txt'", shell=True, check=True)
-    
+    # Create venv for yolov5
+    subprocess.run(["python", "-m", "venv", "yolo5_venv"], check=True)
+    subprocess.run("yolo5_venv/bin/python -m pip install -r app/services/model/yolov5/requirements.txt", shell=True, check=True)
+
+    # Create venv for yolov8
+    subprocess.run(["python", "-m", "venv", "yolov8_venv"], check=True)
+    subprocess.run("yolov8_venv/bin/python -m pip install ultralytics==8.2.103 -q", shell=True, check=True)
+
+
+    # Create venv for yolov11
+    subprocess.run(["python", "-m", "venv", "yolov11_venv"], check=True)
+    subprocess.run('yolov11_venv/bin/python -m pip install "ultralytics<=8.3.40" supervision roboflow', shell=True, check=True)
+
+    return {"message": "Venvs created successfully"}
 
 @app.post("/training-yolo-pretrained")
 async def training_yolo_pretrained(config: str = Form(...)):
