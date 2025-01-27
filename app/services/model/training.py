@@ -28,24 +28,6 @@ dlmodel = DlModel()
 constructdl = ConstructDL()
 
 class MLTraining():
-    def training_ml(self,config):
-        model = None
-        # Load dataset
-        X_train, y_train, class_dict = self.load_dataset('dataset/train')
-        X_val, y_val, _ = self.load_dataset('dataset/valid')
-
-        model = mlmodel.create_ml_model(config)
-
-        model.fit(X_train, y_train)
-
-        # Evaluate on validation data
-        y_val_pred = model.predict(X_val)
-        val_accuracy = accuracy_score(y_val, y_val_pred)
-        print(f"Validation Accuracy: {val_accuracy}")
-
-        # Print class mapping
-        print("Class mapping:", class_dict)
-
     def load_dataset(self,base_path):
         images = []
         labels = []
@@ -90,52 +72,26 @@ class MLTraining():
 
         return np.array(images), np.array(labels), class_dict
 
+    def training_ml(self,config):
+        model = None
+        # Load dataset
+        X_train, y_train, class_dict = self.load_dataset('dataset/train')
+        X_val, y_val, _ = self.load_dataset('dataset/valid')
+
+        model = mlmodel.create_ml_model(config)
+
+        model.fit(X_train, y_train)
+
+        # Evaluate on validation data
+        y_val_pred = model.predict(X_val)
+        val_accuracy = accuracy_score(y_val, y_val_pred)
+        print(f"Validation Accuracy: {val_accuracy}")
+
+        # Print class mapping
+        print("Class mapping:", class_dict)
+
 
 class DLTrainingPretrained():
-    def train(self,config_model, config_training):
-        model = None
-
-        # Load dataset
-        X_train, y_train, class_dict, input_shape = self.load_dataset_dl('dataset/train')
-        X_val, y_val, _, _ = self.load_dataset_dl('dataset/valid', class_dict)
-
-        num_classes = len(class_dict)  # Dynamically get number of classes
-
-        # Create model
-        model = dlmodel.create_dl_model(config_model,num_classes,input_shape)
-
-        # Unpack training configuration
-        learning_rate = config_training[0]
-        learning_rate_scheduler = config_training[1]
-        momentum = config_training[2]
-        optimizer_type = config_training[3]
-        batch_size = config_training[4]
-        epochs = config_training[5]
-        loss_function = get_loss(config_training[6])  # Convert string to loss function
-
-        # Select optimizer
-        if optimizer_type == 'adam':
-            optimizer = Adam(learning_rate=learning_rate)
-        elif optimizer_type == 'sgd':
-            optimizer = SGD(learning_rate=learning_rate, momentum=momentum)
-        else:
-            raise ValueError("Unsupported optimizer type")
-
-        # Compile model
-        model.compile(optimizer=optimizer, loss=loss_function, metrics=['accuracy'])
-
-        # Learning rate scheduler (optional)
-        callbacks = []
-        if learning_rate_scheduler:
-            def scheduler(epoch, lr):
-                return learning_rate_scheduler(epoch, lr)
-            callbacks.append(LearningRateScheduler(scheduler))
-
-        # Train the model
-        history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=epochs, batch_size=batch_size, callbacks=callbacks)
-
-        return history
-
     def load_dataset_dl(self,base_path, class_dict=None):
         images = []
         labels = []
@@ -270,53 +226,45 @@ class DLTrainingPretrained():
         img_size = self.get_image_shape("./dataset/train/")
         batch_size = config_training[0]
         epochs = config_training[1]
-        size = config_training[2]
-
-        # shutil.rmtree("./runs")
-
+        weight_size = config_training[2]
 
         if "yolov5" in config_model:
             # Training model 
-            command = f"yolo5_venv/bin/python ./app/services/model/yolov5/train.py --img {img_size} --batch {batch_size} --epochs {epochs} --data ./data.yaml --weights {size} --cache"
+            command = f"yolo5_venv/bin/python ./app/services/model/yolov5/train.py --img {img_size} --batch {batch_size} --epochs {epochs} --data ./data.yaml --weights {weight_size} --cache"
             subprocess.run(command, shell=True, check=True)
 
             shutil.rmtree("./app/services/model/yolov5/runs/train")
 
-
-
         if "yolov8" in config_model:
             print("training yolov8")
             # TODO: Implement YOLOv8 training
-            command = f"yolov8_venv/bin/yolo task=detect mode=train model={size} data=./data.yaml epochs={epochs} imgsz={img_size} plots=True"
+            command = f"yolov8_venv/bin/yolo task=detect mode=train model={weight_size} data=./data.yaml epochs={epochs} imgsz={img_size} plots=True"
             subprocess.run(command, shell=True, check=True)
 
-            # shutil.rmtree("./runs")
-
-            pass
+            shutil.rmtree("./runs/")
 
         if "yolov11" in config_model:
             # TODO: Implement YOLOv11 training
-            command = f"yolov11_venv/bin/yolo task=detect mode=train model={size} data=./data.yaml epochs={epochs} imgsz={img_size} plots=True"
+            command = f"yolov11_venv/bin/yolo task=detect mode=train model={weight_size} data=./data.yaml epochs={epochs} imgsz={img_size} plots=True"
             subprocess.run(command, shell=True, check=True)
-            pass
+
+            shutil.rmtree("./runs/")
 
         shutil.rmtree("yolo_dataset/train")
         shutil.rmtree("yolo_dataset/test")
         shutil.rmtree("yolo_dataset/valid")
 
-class ConstructTraining():
-    def __init__(self):
-        pass
+    def train_cls(self,config_model, config_training):
+        model = None
 
-    def train(self, config_model, config_training):
         # Load dataset
         X_train, y_train, class_dict, input_shape = self.load_dataset_dl('dataset/train')
         X_val, y_val, _, _ = self.load_dataset_dl('dataset/valid', class_dict)
 
-        num_classes = len(class_dict)
+        num_classes = len(class_dict)  # Dynamically get number of classes
 
         # Create model
-        model = constructdl.construct(config_model, input_shape)
+        model = dlmodel.create_dl_model(config_model,num_classes,input_shape)
 
         # Unpack training configuration
         learning_rate = config_training[0]
@@ -325,7 +273,7 @@ class ConstructTraining():
         optimizer_type = config_training[3]
         batch_size = config_training[4]
         epochs = config_training[5]
-        loss_function = get_loss(config_training[6])
+        loss_function = get_loss(config_training[6])  # Convert string to loss function
 
         # Select optimizer
         if optimizer_type == 'adam':
@@ -338,7 +286,7 @@ class ConstructTraining():
         # Compile model
         model.compile(optimizer=optimizer, loss=loss_function, metrics=['accuracy'])
 
-        # Callbacks
+        # Learning rate scheduler (optional)
         callbacks = []
         if learning_rate_scheduler:
             def scheduler(epoch, lr):
@@ -350,8 +298,57 @@ class ConstructTraining():
 
         return history
 
+class ConstructTraining():
+    def __init__(self):
+        pass
+    
+    def load_dataset_od(self,base_path, class_dict=None):
+        images = []
+        labels = []
+        bboxes = []  # For bounding boxes
+        class_names = [name for name in os.listdir(base_path) if not name.startswith('.')]
+        class_names.sort()
 
-    def load_dataset_dl(self, base_path, class_dict=None):
+        if class_dict is None:
+            class_dict = {class_name: idx for idx, class_name in enumerate(class_names)}
+
+        input_shape = None  # Will be determined based on the first image
+
+        for image_file in os.listdir(base_path):
+            if image_file.lower().endswith(('png', 'jpg', 'jpeg')):
+                img_path = os.path.join(base_path, image_file)
+                annotation_path = os.path.splitext(img_path)[0] + '.txt'  # Assuming YOLO-like annotation files
+                try:
+                    # Load image
+                    img = load_img(img_path)
+                    img_array = img_to_array(img)
+
+                    if input_shape is None:
+                        input_shape = img_array.shape
+                    elif img_array.shape != input_shape:
+                        img = img.resize((input_shape[1], input_shape[0]))
+                        img_array = img_to_array(img)
+
+                    images.append(img_array)
+
+                    # Load bounding box annotations
+                    image_bboxes = []
+                    with open(annotation_path, 'r') as file:
+                        for line in file:
+                            values = line.strip().split()
+                            class_idx = int(values[0])
+                            x_min, y_min, width, height = map(float, values[1:])
+                            image_bboxes.append([x_min, y_min, width, height, class_idx])
+
+                    bboxes.append(image_bboxes)
+
+                except Exception as e:
+                    print(f"Error loading {img_path}: {e}")
+
+        images = np.array(images)
+        return images, bboxes, class_dict, input_shape
+
+    def load_dataset_cls(self, base_path, class_dict=None):
         images = []
         labels = []
         class_names = [name for name in os.listdir(base_path) if not name.startswith('.')]
@@ -392,3 +389,98 @@ class ConstructTraining():
         labels = tf.keras.utils.to_categorical(labels, num_classes=len(class_dict))
 
         return images, labels, class_dict, input_shape
+
+    def yolo_loss(self,y_true, y_pred):
+        # Extract predictions
+        pred_bboxes = y_pred[..., :4]  # Bounding box predictions
+        pred_objectness = y_pred[..., 4:5]  # Objectness score
+        pred_class_probs = y_pred[..., 5:]  # Class probabilities
+
+        # Extract ground truth
+        true_bboxes = y_true[..., :4]
+        true_objectness = y_true[..., 4:5]
+        true_class_probs = y_true[..., 5:]
+
+        # Define losses
+        bbox_loss = tf.reduce_sum(tf.square(true_bboxes - pred_bboxes))  # Example: L2 loss
+        obj_loss = tf.reduce_sum(tf.square(true_objectness - pred_objectness))
+        class_loss = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(true_class_probs, pred_class_probs))
+
+        # Combine losses
+        total_loss = bbox_loss + obj_loss + class_loss
+        return total_loss
+
+    def train_cls(self, config_model, config_training):
+        # Load dataset
+        X_train, y_train, class_dict, input_shape = self.load_dataset_cls('dataset/train')
+        X_val, y_val, _, _ = self.load_dataset_cls('dataset/valid', class_dict)
+
+        num_classes = len(class_dict)
+
+        # Create model
+        model = constructdl.construct(config_model, input_shape)
+
+        # Unpack training configuration
+        learning_rate = config_training[0]
+        learning_rate_scheduler = config_training[1]
+        momentum = config_training[2]
+        optimizer_type = config_training[3]
+        batch_size = config_training[4]
+        epochs = config_training[5]
+        loss_function = get_loss(config_training[6])
+
+        # Select optimizer
+        if optimizer_type == 'adam':
+            optimizer = Adam(learning_rate=learning_rate)
+        elif optimizer_type == 'sgd':
+            optimizer = SGD(learning_rate=learning_rate, momentum=momentum)
+        else:
+            raise ValueError("Unsupported optimizer type")
+
+        # Compile model
+        model.compile(optimizer=optimizer, loss=loss_function, metrics=['accuracy'])
+
+        # Callbacks
+        callbacks = []
+        if learning_rate_scheduler:
+            def scheduler(epoch, lr):
+                return learning_rate_scheduler(epoch, lr)
+            callbacks.append(LearningRateScheduler(scheduler))
+
+        # Train the model
+        history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=epochs, batch_size=batch_size, callbacks=callbacks)
+
+        return history
+
+    def train_od(self, config_model, config_training):
+        # Load object detection dataset
+        X_train, y_train, class_dict, input_shape = self.load_dataset_od('dataset/train')
+        X_val, y_val, _, _ = self.load_dataset_od('dataset/valid', class_dict)
+
+        num_classes = len(class_dict)
+
+        # Create model
+        model = constructdl.construct(config_model, input_shape)
+
+        # Unpack training configuration
+        learning_rate = config_training[0]
+        optimizer_type = config_training[3]
+        batch_size = config_training[4]
+        epochs = config_training[5]
+
+        # Select optimizer
+        if optimizer_type == 'adam':
+            optimizer = Adam(learning_rate=learning_rate)
+        elif optimizer_type == 'sgd':
+            optimizer = SGD(learning_rate=learning_rate, momentum=config_training[2])
+        else:
+            raise ValueError("Unsupported optimizer type")
+
+        # Compile model with custom loss
+        model.compile(optimizer=optimizer, loss=self.yolo_loss)
+
+        # Train the model
+        history = model.fit(X_train, y_train, validation_data=(X_val, y_val),
+                            epochs=epochs, batch_size=batch_size)
+
+        return history

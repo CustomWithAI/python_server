@@ -31,13 +31,27 @@ async def training_ml(config: str = Form(...)):
     print(config)
     mltraining.training_ml(config_dict)
 
-@app.post("/training-dl-pretrained")
+@app.post("/training-dl-cls-pt")
 async def training_dl(config: str = Form(...)):
     config_dict = json.loads(config)
     config_model = config_dict['model']
     config_training = config_dict['training']
     print(config)
-    dltrainingpretrain.train(config_model,config_training)
+    dltrainingpretrain.train_cls(config_model,config_training)
+
+@app.post("/training-dl-cls-construct")
+async def construct_model(config: str = Form(...)):
+    config_dict = json.loads(config)
+    config_model = config_dict['model']
+    config_training = config_dict['training']
+    constructtraining.train_cls(config_model, config_training)
+
+@app.post("/training-dl-od-construct")
+async def construct_model(config: str = Form(...)):
+    config_dict = json.loads(config)
+    config_model = config_dict['model']
+    config_training = config_dict['training']
+    constructtraining.train_od(config_model, config_training)
 
 @app.post("/create_yolo_venv")
 async def create_venv():
@@ -56,19 +70,12 @@ async def create_venv():
 
     return {"message": "Venvs created successfully"}
 
-@app.post("/training-yolo-pretrained")
+@app.post("/training-yolo-pt")
 async def training_yolo_pretrained(config: str = Form(...)):
     config_dict = json.loads(config)
     config_model = config_dict['model']
     config_training = config_dict['training']
     dltrainingpretrain.train_yolo(config_model, config_training)
-
-@app.post("/construct-classification")
-async def construct_model(config: str = Form(...)):
-    config_dict = json.loads(config)
-    config_model = config_dict['model']
-    config_training = config_dict['training']
-    constructtraining.train(config_model, config_training)
 
 @app.post("/dataset")
 async def prepare_dataset(config: str = Form(...)):
