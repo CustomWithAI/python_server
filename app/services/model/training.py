@@ -16,24 +16,29 @@ from tensorflow.keras.callbacks import LearningRateScheduler
 from tensorflow.keras.losses import get as get_loss
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
-from tensorflow.keras.utils import to_categorical, load_img, img_to_array
+from tensorflow.keras.utils import to_categorical, load_img, img_to_array, Sequence
+from tensorflow.keras import layers, models
 import numpy as np
 import os
 
 from app.services.model.ml import MlModel
 from app.services.model.dl_pretrained import DlModel
-from app.services.model.construct import ConstructDL
+from app.services.model.construct_cls import ConstructDCLS
+from app.services.model.construct_od import ConstructDLOD
 mlmodel = MlModel()
 dlmodel = DlModel()
-constructdl = ConstructDL()
+constructdl_cls = ConstructDCLS()
+constructdl_od = ConstructDLOD()
+
 
 class MLTraining():
-    def load_dataset(self,base_path):
+    def load_dataset(self, base_path):
         images = []
         labels = []
         class_names = os.listdir(base_path)
         class_names.sort()
-        class_dict = {class_name: idx for idx, class_name in enumerate(class_names)}
+        class_dict = {class_name: idx for idx,
+                      class_name in enumerate(class_names)}
 
         expected_shape = None
         error_files = []
@@ -46,16 +51,20 @@ class MLTraining():
                     try:
                         img = imread(img_path)
                         if img.ndim == 2:  # Grayscale image
-                            img = np.expand_dims(img, axis=-1)  # Add channel dimension
-                        elif img.ndim == 3 and img.shape[2] == 3:  # Color image
+                            # Add channel dimension
+                            img = np.expand_dims(img, axis=-1)
+                        # Color image
+                        elif img.ndim == 3 and img.shape[2] == 3:
                             pass  # Already has the correct shape
                         else:
-                            raise ValueError(f"Unsupported image dimensions: {img.shape}")
+                            raise ValueError(
+                                f"Unsupported image dimensions: {img.shape}")
 
                         if expected_shape is None:
                             expected_shape = img.shape
                         elif img.shape != expected_shape:
-                            raise ValueError(f"Inconsistent shape for image {img_path}. Expected {expected_shape}, got {img.shape}")
+                            raise ValueError(
+                                f"Inconsistent shape for image {img_path}. Expected {expected_shape}, got {img.shape}")
 
                         img_flattened = img.flatten()
                         images.append(img_flattened)
@@ -72,7 +81,7 @@ class MLTraining():
 
         return np.array(images), np.array(labels), class_dict
 
-    def training_ml(self,config):
+    def training_ml(self, config):
         model = None
         # Load dataset
         X_train, y_train, class_dict = self.load_dataset('dataset/train')
@@ -92,15 +101,18 @@ class MLTraining():
 
 
 class DLTrainingPretrained():
-    def load_dataset_dl(self,base_path, class_dict=None):
+    def load_dataset_dl(self, base_path, class_dict=None):
         images = []
         labels = []
         class_names = os.listdir(base_path)
-        class_names = [name for name in class_names if not name.startswith('.')]  # Exclude hidden files
+        # Exclude hidden files
+        class_names = [
+            name for name in class_names if not name.startswith('.')]
         class_names.sort()
 
         if class_dict is None:
-            class_dict = {class_name: idx for idx, class_name in enumerate(class_names)}
+            class_dict = {class_name: idx for idx,
+                          class_name in enumerate(class_names)}
 
         input_shape = None  # Initialize input shape variable
 
@@ -111,8 +123,10 @@ class DLTrainingPretrained():
                     if filename.lower().endswith(('png', 'jpg', 'jpeg')):  # Ensure only image files are processed
                         img_path = os.path.join(class_path, filename)
                         try:
-                            img = load_img(img_path)  # Load image without resizing
-                            img_array = img_to_array(img)  # Convert image to numpy array
+                            # Load image without resizing
+                            img = load_img(img_path)
+                            # Convert image to numpy array
+                            img_array = img_to_array(img)
                             images.append(img_array)
                             labels.append(class_dict[class_name])
 
@@ -131,7 +145,7 @@ class DLTrainingPretrained():
 
         return images, labels, class_dict, input_shape
 
-    def update_data_yaml(self,data_yaml_path, label_txt_path):
+    def update_data_yaml(self, data_yaml_path, label_txt_path):
         # Read the label.txt file
         with open(label_txt_path, 'r') as file:
             classes = file.read().splitlines()
@@ -155,32 +169,35 @@ class DLTrainingPretrained():
 
         # Write the updated content back to data.yaml with the desired format
         with open(data_yaml_path, 'w') as file:
-            yaml.dump(updated_data, file, default_flow_style=None, sort_keys=False)
+            yaml.dump(updated_data, file,
+                      default_flow_style=None, sort_keys=False)
 
-        print(f"Updated {data_yaml_path} with {len(classes)} classes in the desired format.")
+        print(
+            f"Updated {data_yaml_path} with {len(classes)} classes in the desired format.")
 
-    def get_image_shape(self,folder_path):
+    def get_image_shape(self, folder_path):
         # Get a list of all files in the folder
         file_list = os.listdir(folder_path)
-        
+
         # Filter to ensure only image files are considered
-        image_files = [file for file in file_list if file.endswith(('.png', '.jpg', '.jpeg'))]
-        
+        image_files = [file for file in file_list if file.endswith(
+            ('.png', '.jpg', '.jpeg'))]
+
         # Check if there are any images in the folder
         if image_files:
             # Pick the first image
             image_path = os.path.join(folder_path, image_files[0])
-            
+
             # Load the image using OpenCV
             img = cv2.imread(image_path)
-            
+
             # Return the shape of the image
             return img.shape[1]
         else:
             print("No image files found in the folder!")
             return None
-    
-    def reformat_dataset(self,source_dir, target_dir):
+
+    def reformat_dataset(self, source_dir, target_dir):
         # Define subdirectories in the source dataset and target format
         data_splits = ["train", "test", "valid"]
         subdirs = {"image": "images", "labels": "labels"}
@@ -191,7 +208,8 @@ class DLTrainingPretrained():
             if not os.path.exists(split_source_dir):
                 continue
             for subdir in subdirs.values():
-                os.makedirs(os.path.join(target_dir, split, subdir), exist_ok=True)
+                os.makedirs(os.path.join(
+                    target_dir, split, subdir), exist_ok=True)
 
         # Organize files into the target directory structure
         for split in data_splits:
@@ -210,18 +228,19 @@ class DLTrainingPretrained():
                 else:
                     continue
 
-                target_file = os.path.join(split_target_dir, target_subdir, file)
+                target_file = os.path.join(
+                    split_target_dir, target_subdir, file)
                 shutil.copy2(source_file, target_file)
 
         print("Dataset has been reformatted and cloned to:", target_dir)
-        
+
     def train_yolo(self, config_model, config_training):
         # Clone dataset to the training folder
         self.reformat_dataset("dataset", "yolo_dataset")
 
         # Update data.yaml file
-        self.update_data_yaml("./data.yaml","dataset/train/label.txt")
-        
+        self.update_data_yaml("./data.yaml", "dataset/train/label.txt")
+
         # Extract config training
         img_size = self.get_image_shape("./dataset/train/")
         batch_size = config_training[0]
@@ -229,7 +248,7 @@ class DLTrainingPretrained():
         weight_size = config_training[2]
 
         if "yolov5" in config_model:
-            # Training model 
+            # Training model
             command = f"yolo5_venv/bin/python ./app/services/model/yolov5/train.py --img {img_size} --batch {batch_size} --epochs {epochs} --data ./data.yaml --weights {weight_size} --cache"
             subprocess.run(command, shell=True, check=True)
 
@@ -254,17 +273,18 @@ class DLTrainingPretrained():
         shutil.rmtree("yolo_dataset/test")
         shutil.rmtree("yolo_dataset/valid")
 
-    def train_cls(self,config_model, config_training):
+    def train_cls(self, config_model, config_training):
         model = None
 
         # Load dataset
-        X_train, y_train, class_dict, input_shape = self.load_dataset_dl('dataset/train')
+        X_train, y_train, class_dict, input_shape = self.load_dataset_dl(
+            'dataset/train')
         X_val, y_val, _, _ = self.load_dataset_dl('dataset/valid', class_dict)
 
         num_classes = len(class_dict)  # Dynamically get number of classes
 
         # Create model
-        model = dlmodel.create_dl_model(config_model,num_classes,input_shape)
+        model = dlmodel.create_dl_model(config_model, num_classes, input_shape)
 
         # Unpack training configuration
         learning_rate = config_training[0]
@@ -273,7 +293,8 @@ class DLTrainingPretrained():
         optimizer_type = config_training[3]
         batch_size = config_training[4]
         epochs = config_training[5]
-        loss_function = get_loss(config_training[6])  # Convert string to loss function
+        # Convert string to loss function
+        loss_function = get_loss(config_training[6])
 
         # Select optimizer
         if optimizer_type == 'adam':
@@ -284,7 +305,8 @@ class DLTrainingPretrained():
             raise ValueError("Unsupported optimizer type")
 
         # Compile model
-        model.compile(optimizer=optimizer, loss=loss_function, metrics=['accuracy'])
+        model.compile(optimizer=optimizer, loss=loss_function,
+                      metrics=['accuracy'])
 
         # Learning rate scheduler (optional)
         callbacks = []
@@ -294,68 +316,26 @@ class DLTrainingPretrained():
             callbacks.append(LearningRateScheduler(scheduler))
 
         # Train the model
-        history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=epochs, batch_size=batch_size, callbacks=callbacks)
+        history = model.fit(X_train, y_train, validation_data=(
+            X_val, y_val), epochs=epochs, batch_size=batch_size, callbacks=callbacks)
 
         return history
+
 
 class ConstructTraining():
     def __init__(self):
         pass
-    
-    def load_dataset_od(self,base_path, class_dict=None):
-        images = []
-        labels = []
-        bboxes = []  # For bounding boxes
-        class_names = [name for name in os.listdir(base_path) if not name.startswith('.')]
-        class_names.sort()
-
-        if class_dict is None:
-            class_dict = {class_name: idx for idx, class_name in enumerate(class_names)}
-
-        input_shape = None  # Will be determined based on the first image
-
-        for image_file in os.listdir(base_path):
-            if image_file.lower().endswith(('png', 'jpg', 'jpeg')):
-                img_path = os.path.join(base_path, image_file)
-                annotation_path = os.path.splitext(img_path)[0] + '.txt'  # Assuming YOLO-like annotation files
-                try:
-                    # Load image
-                    img = load_img(img_path)
-                    img_array = img_to_array(img)
-
-                    if input_shape is None:
-                        input_shape = img_array.shape
-                    elif img_array.shape != input_shape:
-                        img = img.resize((input_shape[1], input_shape[0]))
-                        img_array = img_to_array(img)
-
-                    images.append(img_array)
-
-                    # Load bounding box annotations
-                    image_bboxes = []
-                    with open(annotation_path, 'r') as file:
-                        for line in file:
-                            values = line.strip().split()
-                            class_idx = int(values[0])
-                            x_min, y_min, width, height = map(float, values[1:])
-                            image_bboxes.append([x_min, y_min, width, height, class_idx])
-
-                    bboxes.append(image_bboxes)
-
-                except Exception as e:
-                    print(f"Error loading {img_path}: {e}")
-
-        images = np.array(images)
-        return images, bboxes, class_dict, input_shape
 
     def load_dataset_cls(self, base_path, class_dict=None):
         images = []
         labels = []
-        class_names = [name for name in os.listdir(base_path) if not name.startswith('.')]
+        class_names = [name for name in os.listdir(
+            base_path) if not name.startswith('.')]
         class_names.sort()
 
         if class_dict is None:
-            class_dict = {class_name: idx for idx, class_name in enumerate(class_names)}
+            class_dict = {class_name: idx for idx,
+                          class_name in enumerate(class_names)}
 
         input_shape = None  # Will be determined based on the first image
 
@@ -374,7 +354,9 @@ class ConstructTraining():
                                 input_shape = img_array.shape
                             elif img_array.shape != input_shape:
                                 # Resize image if it doesn't match the initial shape
-                                img = img.resize((input_shape[1], input_shape[0]))  # Resize based on height and width of input_shape
+                                # Resize based on height and width of input_shape
+                                img = img.resize(
+                                    (input_shape[1], input_shape[0]))
                                 img_array = img_to_array(img)
 
                             images.append(img_array)
@@ -386,39 +368,21 @@ class ConstructTraining():
         images = np.array(images)
         labels = np.array(labels)
 
-        labels = tf.keras.utils.to_categorical(labels, num_classes=len(class_dict))
+        labels = tf.keras.utils.to_categorical(
+            labels, num_classes=len(class_dict))
 
         return images, labels, class_dict, input_shape
 
-    def yolo_loss(self,y_true, y_pred):
-        # Extract predictions
-        pred_bboxes = y_pred[..., :4]  # Bounding box predictions
-        pred_objectness = y_pred[..., 4:5]  # Objectness score
-        pred_class_probs = y_pred[..., 5:]  # Class probabilities
-
-        # Extract ground truth
-        true_bboxes = y_true[..., :4]
-        true_objectness = y_true[..., 4:5]
-        true_class_probs = y_true[..., 5:]
-
-        # Define losses
-        bbox_loss = tf.reduce_sum(tf.square(true_bboxes - pred_bboxes))  # Example: L2 loss
-        obj_loss = tf.reduce_sum(tf.square(true_objectness - pred_objectness))
-        class_loss = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(true_class_probs, pred_class_probs))
-
-        # Combine losses
-        total_loss = bbox_loss + obj_loss + class_loss
-        return total_loss
-
     def train_cls(self, config_model, config_training):
         # Load dataset
-        X_train, y_train, class_dict, input_shape = self.load_dataset_cls('dataset/train')
+        X_train, y_train, class_dict, input_shape = self.load_dataset_cls(
+            'dataset/train')
         X_val, y_val, _, _ = self.load_dataset_cls('dataset/valid', class_dict)
 
         num_classes = len(class_dict)
 
         # Create model
-        model = constructdl.construct(config_model, input_shape)
+        model = constructdl_cls.construct(config_model, input_shape)
 
         # Unpack training configuration
         learning_rate = config_training[0]
@@ -438,7 +402,8 @@ class ConstructTraining():
             raise ValueError("Unsupported optimizer type")
 
         # Compile model
-        model.compile(optimizer=optimizer, loss=loss_function, metrics=['accuracy'])
+        model.compile(optimizer=optimizer, loss=loss_function,
+                      metrics=['accuracy'])
 
         # Callbacks
         callbacks = []
@@ -448,39 +413,115 @@ class ConstructTraining():
             callbacks.append(LearningRateScheduler(scheduler))
 
         # Train the model
-        history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=epochs, batch_size=batch_size, callbacks=callbacks)
+        history = model.fit(X_train, y_train, validation_data=(
+            X_val, y_val), epochs=epochs, batch_size=batch_size, callbacks=callbacks)
 
         return history
 
+    def load_image_and_annotations(self, img_path, ann_path, input_size):
+        # Load the image
+        img = cv2.imread(img_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert to RGB
+        img = cv2.resize(img, input_size)  # Resize to the required input size
+        img = img.astype(np.float32) / 255.0  # Normalize the image
+
+        # Load annotations (assuming YOLO format: class_id x_center y_center width height)
+        with open(ann_path, 'r') as file:
+            annotations = file.readlines()
+
+        bboxes = []
+        class_ids = []
+
+        for ann in annotations:
+            ann = ann.strip().split()
+            class_id = int(ann[0])
+            x_center, y_center, width, height = map(float, ann[1:])
+
+            # Append to the lists
+            bboxes.append([x_center, y_center, width, height])
+            class_ids.append(class_id)
+
+        return img, np.array(bboxes), np.array(class_ids)
+
+    def load_dataset(self, dataset_dir, input_size):
+        images = []
+        bboxes = []
+        class_ids = []
+
+        for img_file in os.listdir(dataset_dir):
+            if img_file.endswith('.jpg'):
+                img_path = os.path.join(dataset_dir, img_file)
+                ann_path = os.path.splitext(img_path)[0] + '.txt'
+
+                # Load the image and annotations
+                img, bbox, class_id = self.load_image_and_annotations(
+                    img_path, ann_path, input_size)
+
+                images.append(img)
+                bboxes.append(bbox)
+                class_ids.append(class_id)
+
+        class_ids = to_categorical(np.array(class_ids), num_classes=2)
+
+        return np.array(images), np.array(bboxes), class_ids
+
     def train_od(self, config_model, config_training):
-        # Load object detection dataset
-        X_train, y_train, class_dict, input_shape = self.load_dataset_od('dataset/train')
-        X_val, y_val, _, _ = self.load_dataset_od('dataset/valid', class_dict)
-
-        num_classes = len(class_dict)
-
-        # Create model
-        model = constructdl.construct(config_model, input_shape)
-
         # Unpack training configuration
         learning_rate = config_training[0]
-        optimizer_type = config_training[3]
-        batch_size = config_training[4]
-        epochs = config_training[5]
+        momentum = config_training[1]
+        optimizer_type = config_training[2]
+        batch_size = config_training[3]
+        epochs = config_training[4]
 
         # Select optimizer
         if optimizer_type == 'adam':
             optimizer = Adam(learning_rate=learning_rate)
         elif optimizer_type == 'sgd':
-            optimizer = SGD(learning_rate=learning_rate, momentum=config_training[2])
+            optimizer = SGD(learning_rate=learning_rate, momentum=momentum)
         else:
             raise ValueError("Unsupported optimizer type")
 
-        # Compile model with custom loss
-        model.compile(optimizer=optimizer, loss=self.yolo_loss)
+        # Check image size
+        folder_path = './dataset/train/'
+        image_files = [f for f in os.listdir(
+            folder_path) if f.endswith(('png', 'jpg', 'jpeg'))]
+        image_path = os.path.join(folder_path, image_files[0])
+        img = cv2.imread(image_path)
+        img_shape = img.shape
+        input_shape = img_shape[:2]
 
-        # Train the model
-        history = model.fit(X_train, y_train, validation_data=(X_val, y_val),
-                            epochs=epochs, batch_size=batch_size)
+        # check how many classes
+        with open('./dataset/train/label.txt', 'r') as file:
+            line_count = sum(1 for line in file)
+        num_classes = line_count
 
-        return history
+        model = constructdl_od.construct(
+            config_model, img_shape, num_classes)
+        model.summary()
+
+        # Compile the model
+        model.compile(
+            optimizer=optimizer,
+            loss={
+                'bbox_output': 'mse',  # Regression loss for bounding boxes
+                'class_output': 'categorical_crossentropy'  # Classification loss
+            },
+            loss_weights={'bbox_output': 1.0, 'class_output': 1.0},
+            metrics={'class_output': 'accuracy'}
+        )
+
+        # Load dataset for training and validation
+        X_train, y_bboxes_train, y_classes_train = self.load_dataset(
+            './dataset/train', input_shape)
+        X_valid, y_bboxes_valid, y_classes_valid = self.load_dataset(
+            './dataset/valid', input_shape)
+
+        # Train with explicit validation data
+        history = model.fit(
+            X_train,
+            {'bbox_output': y_bboxes_train, 'class_output': y_classes_train},
+            batch_size=batch_size,
+            epochs=epochs,
+            validation_data=(
+                X_valid, {'bbox_output': y_bboxes_valid, 'class_output': y_classes_valid})
+        )

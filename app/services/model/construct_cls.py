@@ -1,10 +1,10 @@
 import tensorflow as tf
 from tensorflow.keras import layers, models
 
-class ConstructDL(object):
+
+class ConstructDCLS(object):
     def __init__(self):
         pass
-
 
     def construct(self, config, input_shape):
         model = models.Sequential()
@@ -18,7 +18,8 @@ class ConstructDL(object):
             elif "convolutionalLayer_filters" in layer_config:
                 model.add(layers.Conv2D(
                     filters=layer_config["convolutionalLayer_filters"],
-                    kernel_size=eval(layer_config["convolutionalLayer_kernelSize"]),
+                    kernel_size=eval(
+                        layer_config["convolutionalLayer_kernelSize"]),
                     strides=eval(layer_config["convolutionalLayer_strides"]),
                     padding=layer_config["convolutionalLayer_padding"],
                     activation=layer_config["convolutionalLayer_activation"]
@@ -52,7 +53,8 @@ class ConstructDL(object):
                     ))
 
             elif "activationLayer_function" in layer_config:
-                model.add(layers.Activation(layer_config["activationLayer_function"]))
+                model.add(layers.Activation(
+                    layer_config["activationLayer_function"]))
 
             elif "dropoutLayer_rate" in layer_config:
                 model.add(layers.Dropout(layer_config["dropoutLayer_rate"]))
