@@ -1,3 +1,6 @@
+from skimage.feature import hog
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+from tensorflow.keras.utils import to_categorical
 import os
 import numpy as np
 import os
@@ -18,6 +21,8 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
 from tensorflow.keras.utils import to_categorical, load_img, img_to_array, Sequence
 from tensorflow.keras import layers, models
+from sklearn.preprocessing import LabelEncoder
+
 import numpy as np
 import os
 
@@ -25,10 +30,12 @@ from app.services.model.ml import MlModel
 from app.services.model.dl_pretrained import DlModel
 from app.services.model.construct_cls import ConstructDCLS
 from app.services.model.construct_od import ConstructDLOD
+from app.services.dataset.featextraction import FeatureExtraction
 mlmodel = MlModel()
 dlmodel = DlModel()
 constructdl_cls = ConstructDCLS()
 constructdl_od = ConstructDLOD()
+feature_extractor = FeatureExtraction()
 
 
 class MLTraining():
@@ -81,14 +88,79 @@ class MLTraining():
 
         return np.array(images), np.array(labels), class_dict
 
-    def training_ml(self, config):
+    def load_dataset_featex(self, folder_path, hog_params=None, sift_params=None, orb_params=None):
+        X, y = [], []
+
+        for label in os.listdir(folder_path):
+            label_path = os.path.join(folder_path, label)
+            if not os.path.isdir(label_path):
+                continue
+
+            for file in os.listdir(label_path):
+                file_path = os.path.join(label_path, file)
+                if file_path.endswith(".DS_Store"):
+                    continue
+
+                image = cv2.imread(file_path)
+                if image is None:
+                    continue
+
+                # Extract features only if params are provided
+                feature_vector = []
+
+                if hog_params:  # Check if HOG config exists
+                    # print("doing HOG")
+                    hog_features = feature_extractor.extract_hog_features(
+                        image, **hog_params)
+                    feature_vector.append(hog_features)
+
+                if sift_params:  # Check if SIFT config exists
+                    # print("doing SIFT")
+                    sift_features = feature_extractor.extract_sift_features(
+                        image, **sift_params)
+                    feature_vector.append(sift_features)
+
+                if orb_params:  # Check if ORB config exists
+                    # print("doing ORB")
+                    orb_features = feature_extractor.extract_orb_features(
+                        image, **orb_params)
+                    feature_vector.append(orb_features)
+
+                # Flatten the feature vector if any features were extracted
+                if feature_vector:
+                    feature_vector = np.hstack(feature_vector)
+                    X.append(feature_vector)
+                    y.append(label)
+                else:
+                    print(
+                        f"Skipping {file_path}, no feature extraction methods enabled.")
+
+        return np.array(X), np.array(y)
+
+    def training_ml_cls(self, config_model, config_featex):
         model = None
         # Load dataset
-        X_train, y_train, class_dict = self.load_dataset('dataset/train')
-        X_val, y_val, _ = self.load_dataset('dataset/valid')
+        if not config_featex:  # Use 'if not' instead of 'config_featex == {}'
+            X_train, y_train, class_dict = self.load_dataset('dataset/train')
+            X_val, y_val, _ = self.load_dataset('dataset/valid')
+        else:
+            # Extract parameters (no need for json.loads)
+            hog_params = config_featex["hog"]
+            sift_params = config_featex["sift"]
+            orb_params = config_featex["orb"]
 
-        model = mlmodel.create_ml_model(config)
+            # Load datasets
+            X_train, y_train = self.load_dataset_featex(
+                'dataset/train', hog_params, sift_params, orb_params)
+            X_val, y_val = self.load_dataset_featex(
+                'dataset/valid', hog_params, sift_params, orb_params)
 
+            # Encode labels
+            encoder = LabelEncoder()
+            y_train = encoder.fit_transform(y_train)
+            y_val = encoder.transform(y_val)
+
+        model = mlmodel.create_ml_model(config_model)
         model.fit(X_train, y_train)
 
         # Evaluate on validation data
@@ -96,16 +168,15 @@ class MLTraining():
         val_accuracy = accuracy_score(y_val, y_val_pred)
         print(f"Validation Accuracy: {val_accuracy}")
 
-        # Print class mapping
-        print("Class mapping:", class_dict)
-
 
 class DLTrainingPretrained():
+
     def load_dataset_dl(self, base_path, class_dict=None):
         images = []
         labels = []
+
+        # Find class dict
         class_names = os.listdir(base_path)
-        # Exclude hidden files
         class_names = [
             name for name in class_names if not name.startswith('.')]
         class_names.sort()
@@ -120,24 +191,31 @@ class DLTrainingPretrained():
             class_path = os.path.join(base_path, class_name)
             if os.path.isdir(class_path):
                 for filename in os.listdir(class_path):
-                    if filename.lower().endswith(('png', 'jpg', 'jpeg')):  # Ensure only image files are processed
+                    if filename.lower().endswith(('png', 'jpg', 'jpeg')):
                         img_path = os.path.join(class_path, filename)
                         try:
-                            # Load image without resizing
+                            # Load image
                             img = load_img(img_path)
-                            # Convert image to numpy array
                             img_array = img_to_array(img)
-                            images.append(img_array)
-                            labels.append(class_dict[class_name])
 
                             # Set input shape based on the first image loaded
                             if input_shape is None:
+                                # (height, width, channels)
                                 input_shape = img_array.shape
+
+                            # Ensure all images match input_shape
+                            if img_array.shape != input_shape:
+                                print(
+                                    f"Skipping {img_path} due to mismatched shape: {img_array.shape}")
+                                continue
+
+                            images.append(img_array)
+                            labels.append(class_dict[class_name])
 
                         except Exception as e:
                             print(f"Error loading image {img_path}: {e}")
 
-        images = np.array(images)
+        images = np.array(images, dtype=np.float32)  # Ensure consistent dtype
         labels = np.array(labels)
 
         # One-hot encode the labels
@@ -279,9 +357,9 @@ class DLTrainingPretrained():
         # Load dataset
         X_train, y_train, class_dict, input_shape = self.load_dataset_dl(
             'dataset/train')
-        X_val, y_val, _, _ = self.load_dataset_dl('dataset/valid', class_dict)
-
-        num_classes = len(class_dict)  # Dynamically get number of classes
+        X_val, y_val, _, _ = self.load_dataset_dl(
+            'dataset/valid')
+        num_classes = len(class_dict)
 
         # Create model
         model = dlmodel.create_dl_model(config_model, num_classes, input_shape)
@@ -373,13 +451,19 @@ class ConstructTraining():
 
         return images, labels, class_dict, input_shape
 
-    def train_cls(self, config_model, config_training):
+    def train_cls(self, config_model, config_training, config_featex):
+        model = None
         # Load dataset
-        X_train, y_train, class_dict, input_shape = self.load_dataset_cls(
-            'dataset/train')
-        X_val, y_val, _, _ = self.load_dataset_cls('dataset/valid', class_dict)
-
-        num_classes = len(class_dict)
+        if not config_featex:
+            X_train, y_train, class_dict, input_shape = self.load_dataset_cls(
+                'dataset/train')
+            X_val, y_val, _, _ = self.load_dataset_cls(
+                'dataset/valid', class_dict)
+        else:
+            X_train, y_train, class_dict, input_shape = self.load_dataset_cls_featex(
+                'dataset/train', config_featex)
+            X_val, y_val, _, _ = self.load_dataset_cls_featex(
+                'dataset/valid', class_dict, config_featex)
 
         # Create model
         model = constructdl_cls.construct(config_model, input_shape)

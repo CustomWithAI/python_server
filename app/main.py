@@ -3,7 +3,7 @@ import json
 import os
 import glob
 import subprocess
-from app.services.dataset.dataset import preprocess_all_dataset, augment_dataset_class, augment_dataset_obj
+from app.services.dataset.dataset import preprocess_all_dataset, augment_dataset_class, augment_dataset_obj, augment_dataset_seg
 from app.services.model.training import MLTraining, DLTrainingPretrained, ConstructTraining
 mltraining = MLTraining()
 dltrainingpretrain = DLTrainingPretrained()
@@ -31,8 +31,9 @@ async def status():
 @app.post("/training-ml")
 async def training_ml(config: str = Form(...)):
     config_dict = json.loads(config)
-    print(config)
-    mltraining.training_ml(config_dict)
+    config_model = config_dict['model']
+    config_featex = config_dict['featex']
+    mltraining.training_ml_cls(config_model, config_featex)
 
 
 @app.post("/training-dl-cls-pt")
@@ -40,7 +41,6 @@ async def training_dl(config: str = Form(...)):
     config_dict = json.loads(config)
     config_model = config_dict['model']
     config_training = config_dict['training']
-    print(config)
     dltrainingpretrain.train_cls(config_model, config_training)
 
 
@@ -49,7 +49,8 @@ async def construct_model(config: str = Form(...)):
     config_dict = json.loads(config)
     config_model = config_dict['model']
     config_training = config_dict['training']
-    constructtraining.train_cls(config_model, config_training)
+    config_featex = config_dict['featex']
+    constructtraining.train_cls(config_model, config_training, config_featex)
 
 
 @app.post("/training-dl-od-construct")
@@ -93,7 +94,7 @@ async def prepare_dataset(config: str = Form(...)):
     all_config = json.loads(config)
     config_type = all_config['type']
     config_preprocess = all_config["preprocess"]
-    # config_featextraction = all_config["feature_extraction"]
+    config_featextraction = all_config["feature_extraction"]
     # config_featselection = all_config["feature_selection"]
     config_augmentation = all_config["augmentation"]
 
@@ -127,6 +128,9 @@ async def prepare_dataset(config: str = Form(...)):
                     training_path, config_augmentation["number"], config_augmentation)
             if config_type == "object_detection":
                 augment_dataset_obj(
+                    training_path, config_augmentation["number"], config_augmentation)
+            if config_type == "segmentation":
+                augment_dataset_seg(
                     training_path, config_augmentation["number"], config_augmentation)
 
     # # TODO: Feature Extraction
