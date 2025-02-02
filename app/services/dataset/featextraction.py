@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 from typing import Dict
 from skimage.feature import hog
+from sklearn.preprocessing import LabelEncoder
+from tensorflow.keras.utils import to_categorical
 
 
 class FeatureExtraction:
@@ -53,3 +55,53 @@ class FeatureExtraction:
         else:
             features = np.zeros(max_features)
         return features
+
+    def feature_extraction_con_cls(self, X, y, config):
+        def extract_hog(img):
+            img = cv2.resize(img, (64, 64))
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            return hog(img, orientations=config["hog"]["orientations"],
+                       pixels_per_cell=tuple(config["hog"]["pixels_per_cell"]),
+                       cells_per_block=tuple(config["hog"]["cells_per_block"]),
+                       visualize=False)
+
+        def extract_sift(img):
+            sift = cv2.SIFT_create(nfeatures=config["sift"]["number_of_keypoints"],
+                                   contrastThreshold=config["sift"]["contrast_threshold"],
+                                   edgeThreshold=config["sift"]["edge_threshold"])
+            keypoints, descriptors = sift.detectAndCompute(img, None)
+            if descriptors is None:
+                return np.zeros(config["sift"]["number_of_keypoints"])
+            descriptors = descriptors.flatten()
+            return descriptors[:config["sift"]["number_of_keypoints"]] if descriptors.shape[0] >= config["sift"]["number_of_keypoints"] else np.pad(descriptors, (0, config["sift"]["number_of_keypoints"] - descriptors.shape[0]))
+
+        def extract_orb(img):
+            orb = cv2.ORB_create(nfeatures=config["orb"]["keypoints"],
+                                 scaleFactor=config["orb"]["scale_factor"],
+                                 nlevels=config["orb"]["n_level"])
+            keypoints, descriptors = orb.detectAndCompute(img, None)
+            if descriptors is None:
+                return np.zeros(config["orb"]["keypoints"])
+            descriptors = descriptors.flatten()
+            return descriptors[:config["orb"]["keypoints"]] if descriptors.shape[0] >= config["orb"]["keypoints"] else np.pad(descriptors, (0, config["orb"]["keypoints"] - descriptors.shape[0]))
+
+        feature_list, labels = [], []
+        for img, label in zip(X, y):
+            gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            features = np.hstack(
+                [extract_hog(img), extract_sift(gray_img), extract_orb(gray_img)])
+            feature_list.append(features)
+            labels.append(label)
+
+        X = np.array(feature_list, dtype=np.float32)
+        y = np.array(labels)
+
+        if y.size == 0:
+            raise ValueError(
+                "Error: No images were processed for feature extraction.")
+
+        encoder = LabelEncoder()
+        y = encoder.fit_transform(y)
+        y = to_categorical(y)
+
+        return X, y

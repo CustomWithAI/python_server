@@ -451,6 +451,32 @@ class ConstructTraining():
 
         return images, labels, class_dict, input_shape
 
+    def load_dataset_cls_featex(self, dataset_path):
+        print(f"Dataset Path Exists: {os.path.exists(dataset_path)}")
+        classes = [cls for cls in os.listdir(
+            dataset_path) if not cls.startswith('.')]
+        print(f"Classes Found: {classes}")
+
+        X, y = [], []
+        for label in classes:
+            class_path = os.path.join(dataset_path, label)
+            if not os.path.isdir(class_path):
+                continue
+
+            for img_name in os.listdir(class_path):
+                img_path = os.path.join(class_path, img_name)
+                img = cv2.imread(img_path)
+
+                if img is None:
+                    print(f"⚠️ Skipping: {img_path} (Image not loaded)")
+                    continue
+
+                X.append(img)
+                y.append(label)
+
+        print(f"Total Samples Loaded from {dataset_path}: {len(y)}")
+        return X, y
+
     def train_cls(self, config_model, config_training, config_featex):
         model = None
         # Load dataset
@@ -460,10 +486,14 @@ class ConstructTraining():
             X_val, y_val, _, _ = self.load_dataset_cls(
                 'dataset/valid', class_dict)
         else:
-            X_train, y_train, class_dict, input_shape = self.load_dataset_cls_featex(
-                'dataset/train', config_featex)
-            X_val, y_val, _, _ = self.load_dataset_cls_featex(
-                'dataset/valid', class_dict, config_featex)
+            X_train, y_train = self.load_dataset_cls_featex('dataset/train')
+            X_val, y_val = self.load_dataset_cls_featex('dataset/valid')
+            X_train, y_train = feature_extractor.feature_extraction_con_cls(
+                X_train, y_train, config_featex)
+            X_val, y_val = feature_extractor.feature_extraction_con_cls(
+                X_val, y_val, config_featex)
+
+            input_shape = (X_train.shape[1],)
 
         # Create model
         model = constructdl_cls.construct(config_model, input_shape)
