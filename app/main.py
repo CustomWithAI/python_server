@@ -58,7 +58,12 @@ async def construct_model(config: str = Form(...)):
     config_dict = json.loads(config)
     config_model = config_dict['model']
     config_training = config_dict['training']
-    constructtraining.train_od(config_model, config_training)
+    config_featex = config_dict['featex']
+    if not config_featex:
+        constructtraining.train_od(config_model, config_training)
+    else:
+        constructtraining.train_od_featex(
+            config_model, config_training, config_featex)
 
 
 @app.post("/create_yolo_venv")

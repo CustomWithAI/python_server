@@ -639,3 +639,147 @@ class ConstructTraining():
             validation_data=(
                 X_valid, {'bbox_output': y_bboxes_valid, 'class_output': y_classes_valid})
         )
+
+    def get_image_paths(self, dataset_path):
+        """Returns image file paths and corresponding annotation files."""
+        image_files = [f for f in os.listdir(
+            dataset_path) if f.endswith('.jpg')]
+        annotation_files = [f.replace('.jpg', '.txt') for f in image_files]
+        return image_files, annotation_files
+
+    def load_data_od_featex(self, dataset_path, image_files, annotation_files, img_size, config_featex):
+        """Loads and processes images, extracting features and annotations."""
+        X_features, X_images, y_boxes, y_classes = [], [], [], []
+        min_feature_size = float('inf')  # Initialize with a large value
+
+        # First pass to determine the minimum feature size
+        feature_sizes = []
+        for img_file in image_files:
+            img_path = os.path.join(dataset_path, img_file)
+
+            # Load image
+            image = cv2.imread(img_path)
+
+            # Extract features without truncation
+            features = feature_extractor.extract_features_con_od(
+                image, fixed_size=None, config_featex=config_featex)
+            feature_sizes.append(features.shape[0])
+
+        min_feature_size = min(feature_sizes)  # Find smallest feature size
+
+        # Second pass to extract features with fixed size
+        for img_file, ann_file in zip(image_files, annotation_files):
+            img_path = os.path.join(dataset_path, img_file)
+            ann_path = os.path.join(dataset_path, ann_file)
+
+            # Load image
+            image = cv2.imread(img_path)
+            features = feature_extractor.extract_features_con_od(
+                image, fixed_size=min_feature_size, config_featex=config_featex)
+            image = image / 255.0  # Normalize after feature extraction
+
+            X_features.append(features)
+            X_images.append(image)
+
+            # Read annotation file
+            with open(ann_path, "r") as f:
+                lines = f.readlines()
+                for line in lines:
+                    parts = line.strip().split()
+                    class_id = int(parts[0])  # First value is class label
+                    x_center, y_center, width, height = map(float, parts[1:])
+
+                    # Normalize bounding boxes
+                    x_center /= img_size
+                    y_center /= img_size
+                    width /= img_size
+                    height /= img_size
+
+                    y_boxes.append([x_center, y_center, width, height])
+                    y_classes.append(class_id)
+
+        return np.array(X_features), np.array(X_images), np.array(y_boxes), np.array(y_classes), min_feature_size
+
+    def train_od_featex(self, config_model, config_training, config_featex):
+        # Check image size
+        folder_path = './dataset/train/'
+        image_files = [f for f in os.listdir(
+            folder_path) if f.endswith(('png', 'jpg', 'jpeg'))]
+        image_path = os.path.join(folder_path, image_files[0])
+        img = cv2.imread(image_path)
+        img_shape = img.shape
+        img_size = img_shape[1]
+        print(f"Image size: {img_size}")
+
+        # Load training data
+        train_image_files, train_annotation_files = self.get_image_paths(
+            "dataset/train")
+        X_features_train, X_images_train, y_boxes_train, y_classes_train, min_feature_size = self.load_data_od_featex(
+            "dataset/train", train_image_files, train_annotation_files, img_size, config_featex=config_featex)
+
+        # Load validation data
+        valid_image_files, valid_annotation_files = self.get_image_paths(
+            "dataset/valid")
+        X_features_valid, X_images_valid, y_boxes_valid, y_classes_valid, _ = self.load_data_od_featex(
+            "dataset/valid", valid_image_files, valid_annotation_files, img_size, config_featex=config_featex)
+
+        # Convert to NumPy array
+        y_classes_train = np.array(y_classes_train)
+        y_classes_valid = np.array(y_classes_valid)
+
+        # Convert to class indices if one-hot encoded
+        if y_classes_train.ndim > 1:
+            y_classes_train = np.argmax(y_classes_train, axis=1)
+        if y_classes_valid.ndim > 1:
+            y_classes_valid = np.argmax(y_classes_valid, axis=1)
+
+        # Count unique class labels
+        num_classes = len(np.unique(y_classes_train))
+
+        # One-hot encode labels properly
+        y_classes_train = tf.keras.utils.to_categorical(
+            y_classes_train, num_classes=num_classes)
+        y_classes_valid = tf.keras.utils.to_categorical(
+            y_classes_valid, num_classes=num_classes)
+
+        print(f"Number of Classes: {num_classes}")
+
+        # Build model
+        model = constructdl_od.construct_od_featex(
+            config_model, input_shape=min_feature_size, num_classes=num_classes)
+
+        # Unpack training configuration
+        learning_rate = config_training[0]
+        momentum = config_training[1]
+        optimizer_type = config_training[2]
+        batch_size = config_training[3]
+        epochs = config_training[4]
+
+        # Select optimizer
+        if optimizer_type == 'adam':
+            optimizer = Adam(learning_rate=learning_rate)
+        elif optimizer_type == 'sgd':
+            optimizer = SGD(learning_rate=learning_rate, momentum=momentum)
+        else:
+            raise ValueError("Unsupported optimizer type")
+
+        # Compile model
+        model.compile(
+            optimizer=optimizer,
+            loss={"class_output": "categorical_crossentropy",
+                  "bbox_output": "mean_squared_error"},
+            metrics={"class_output": "accuracy", "bbox_output": "mae"}
+        )
+
+        # Train model with explicit validation data
+        model.fit(
+            X_features_train, {"class_output": y_classes_train,
+                               "bbox_output": y_boxes_train},
+            validation_data=(X_features_valid, {
+                "class_output": y_classes_valid, "bbox_output": y_boxes_valid}),
+            epochs=epochs,
+            batch_size=batch_size
+        )
+
+        # Save model
+        print("Training completed!")

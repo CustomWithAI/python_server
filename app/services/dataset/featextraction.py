@@ -8,7 +8,9 @@ from tensorflow.keras.utils import to_categorical
 
 class FeatureExtraction:
     def __init__(self):
-        pass
+        self.hog = cv2.HOGDescriptor()
+        self.sift = cv2.SIFT_create()
+        self.orb = cv2.ORB_create()
 
     @staticmethod
     def extract_hog_features(image, pixels_per_cell=(8, 8), cells_per_block=(2, 2), orientations=9, fixed_length=500):
@@ -105,3 +107,54 @@ class FeatureExtraction:
         y = to_categorical(y)
 
         return X, y
+
+    def extract_features_con_od(self, image, fixed_size=None, config_featex=None):
+        """Extracts configurable features (HOG, SIFT, ORB) from the given image."""
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        features_list = []
+
+        # Extract HOG features if specified in config
+        if "hog" in config_featex:
+            try:
+                hog_features = self.hog.compute(gray).flatten()
+                features_list.append(hog_features)
+            except Exception as e:
+                print(f"Error extracting HOG: {e}")
+
+        # Extract SIFT features if specified in config
+        if "sift" in config_featex:
+            keypoints, descriptors = self.sift.detectAndCompute(gray, None)
+            if descriptors is not None:
+                features_list.append(descriptors.flatten())
+            else:
+                print("Warning: No SIFT descriptors found, filling with zeros.")
+                features_list.append(
+                    np.zeros(config_featex["sift"]["number_of_keypoints"] * 128))
+
+        # Extract ORB features if specified in config
+        if "orb" in config_featex:
+            keypoints, descriptors = self.orb.detectAndCompute(gray, None)
+            if descriptors is not None:
+                features_list.append(descriptors.flatten())
+            else:
+                print("Warning: No ORB descriptors found, filling with zeros.")
+                features_list.append(
+                    np.zeros(config_featex["orb"]["keypoints"] * 32))
+
+        # Concatenate all selected features
+        if features_list:
+            features = np.concatenate(features_list)
+        else:
+            print("Warning: No features extracted, returning zeros.")
+            features = np.zeros(fixed_size if fixed_size else 1)
+
+        # Ensure fixed feature size if specified
+        if fixed_size:
+            if features.shape[0] > fixed_size:
+                features = features[:fixed_size]  # Truncate if too long
+            else:
+                padding = np.zeros(fixed_size - features.shape[0])
+                features = np.concatenate(
+                    [features, padding])  # Pad if too short
+
+        return features

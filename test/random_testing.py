@@ -19,7 +19,7 @@ class ConstructDLOD(object):
         print("Received input_shape:", input_shape)
 
         # Correct input shape for the feature vector
-        inputs = tf.keras.layers.Input(shape=(5000,))
+        inputs = tf.keras.layers.Input(shape=(input_shape,))
         x = inputs
 
         # Add dense layers based on the configuration
@@ -53,7 +53,7 @@ def get_image_paths(dataset_path):
     return image_files, annotation_files
 
 
-def extract_features(image, fixed_size=5000, config_featex=None):
+def extract_features(image, fixed_size=None, config_featex=None):
     """Extracts features from an image using HOG, SIFT, and ORB."""
     if image.dtype != np.uint8:
         image = (image * 255).astype(np.uint8)
@@ -62,25 +62,19 @@ def extract_features(image, fixed_size=5000, config_featex=None):
 
     # Default HOG parameters
     hog_desc = cv2.HOGDescriptor(
-        _winSize=(8, 8),  # Set the window size
-        _blockSize=(16, 16),  # Block size should be divisible by cell size
-        _blockStride=(8, 8),  # Block stride
-        _cellSize=(8, 8),  # Cell size
-        _nbins=9  # Number of bins
+        _winSize=(8, 8),
+        _blockSize=(16, 16),
+        _blockStride=(8, 8),
+        _cellSize=(8, 8),
+        _nbins=9
     )
 
-    # If custom configurations are provided for HOG
     if config_featex and 'hog' in config_featex:
         hog_params = config_featex['hog']
-        # Ensure blockSize is divisible by cellSize
         block_size = tuple(hog_params.get("cells_per_block", [2, 2]))
         cell_size = tuple(hog_params.get("pixels_per_cell", [8, 8]))
 
-        # Adjust the block size to ensure divisibility by cell size
         if block_size[0] % cell_size[0] != 0 or block_size[1] % cell_size[1] != 0:
-            print(
-                f"Warning: Adjusting blockSize {block_size} to be divisible by cellSize {cell_size}")
-            # Adjust to multiples of cell size
             block_size = (cell_size[0] * 2, cell_size[1] * 2)
 
         hog_desc = cv2.HOGDescriptor(
@@ -117,12 +111,13 @@ def extract_features(image, fixed_size=5000, config_featex=None):
     # Concatenate features
     features = np.hstack([hog_features, sift_features, orb_features])
 
-    # Ensure a fixed length (pad or truncate)
-    if features.shape[0] < fixed_size:
-        features = np.pad(
-            features, (0, fixed_size - features.shape[0]), mode='constant')
-    else:
-        features = features[:fixed_size]
+    # Apply padding or truncation only if fixed_size is set
+    if fixed_size is not None:
+        if features.shape[0] < fixed_size:
+            features = np.pad(
+                features, (0, fixed_size - features.shape[0]), mode='constant')
+        else:
+            features = features[:fixed_size]
 
     return features
 
@@ -130,7 +125,25 @@ def extract_features(image, fixed_size=5000, config_featex=None):
 def load_data(dataset_path, image_files, annotation_files, img_size, config_featex):
     """Loads and processes images, extracting features and annotations."""
     X_features, X_images, y_boxes, y_classes = [], [], [], []
+    min_feature_size = float('inf')  # Initialize with a large value
 
+    # First pass to determine the minimum feature size
+    feature_sizes = []
+    for img_file in image_files:
+        img_path = os.path.join(dataset_path, img_file)
+
+        # Load image
+        image = cv2.imread(img_path)
+        image = cv2.resize(image, (img_size, img_size))
+
+        # Extract features without truncation
+        features = extract_features(
+            image, fixed_size=None, config_featex=config_featex)
+        feature_sizes.append(features.shape[0])
+
+    min_feature_size = min(feature_sizes)  # Find smallest feature size
+
+    # Second pass to extract features with fixed size
     for img_file, ann_file in zip(image_files, annotation_files):
         img_path = os.path.join(dataset_path, img_file)
         ann_path = os.path.join(dataset_path, ann_file)
@@ -138,7 +151,8 @@ def load_data(dataset_path, image_files, annotation_files, img_size, config_feat
         # Load image
         image = cv2.imread(img_path)
         image = cv2.resize(image, (img_size, img_size))
-        features = extract_features(image, config_featex=config_featex)
+        features = extract_features(
+            image, fixed_size=min_feature_size, config_featex=config_featex)
         image = image / 255.0  # Normalize after feature extraction
 
         X_features.append(features)
@@ -161,36 +175,10 @@ def load_data(dataset_path, image_files, annotation_files, img_size, config_feat
                 y_boxes.append([x_center, y_center, width, height])
                 y_classes.append(class_id)
 
-    return np.array(X_features), np.array(X_images), np.array(y_boxes), np.array(y_classes)
-
-
-def train_model(model, X_features, y_classes, y_boxes, epochs=10, batch_size=16):
-    """Trains the model with the given data."""
-    # Compile the model
-    model.compile(
-        optimizer=Adam(),
-        loss={
-            "class_output": "categorical_crossentropy",
-            "bbox_output": "mean_squared_error"
-        },
-        metrics={
-            "class_output": "accuracy",
-            "bbox_output": "mae"
-        }
-    )
-
-    # Train the model using X_features (should have shape (num_samples, 5000))
-    model.fit(
-        X_features,  # Use features (5000-dimensional vectors)
-        {"class_output": y_classes, "bbox_output": y_boxes},
-        epochs=epochs,
-        batch_size=batch_size,
-        validation_split=0.2
-    )
+    return np.array(X_features), np.array(X_images), np.array(y_boxes), np.array(y_classes), min_feature_size
 
 
 def main():
-
     # Define feature extraction configuration
     config_featex = {
         "hog": {"pixels_per_cell": [8, 8], "cells_per_block": [2, 2], "orientations": 9},
@@ -198,46 +186,67 @@ def main():
         "orb": {"keypoints": 128, "scale_factor": 1.2, "n_level": 8}
     }
 
-    # Step 1: Get image and annotation paths
-    image_files, annotation_files = get_image_paths(DATASET_PATH)
+    # Load training data
+    train_image_files, train_annotation_files = get_image_paths(
+        "dataset/train")
+    X_features_train, X_images_train, y_boxes_train, y_classes_train, min_feature_size = load_data(
+        "dataset/train", train_image_files, train_annotation_files, IMG_SIZE, config_featex=config_featex)
 
-    # Step 2: Load and preprocess data
-    X_features, X_images, y_boxes, y_classes = load_data(
-        DATASET_PATH, image_files, annotation_files, IMG_SIZE, config_featex=config_featex)
+    # Load validation data
+    valid_image_files, valid_annotation_files = get_image_paths(
+        "dataset/valid")
+    X_features_valid, X_images_valid, y_boxes_valid, y_classes_valid, _ = load_data(
+        "dataset/valid", valid_image_files, valid_annotation_files, IMG_SIZE, config_featex=config_featex)
 
-    # Step 3: Convert y_classes to one-hot encoding
-    y_classes = tf.keras.utils.to_categorical(
-        y_classes, num_classes=len(set(y_classes)))
+    # Convert to NumPy array
+    y_classes_train = np.array(y_classes_train)
+    y_classes_valid = np.array(y_classes_valid)
 
-    # Step 4: Get the number of classes
-    y_classes_flat = np.argmax(y_classes, axis=1)
-    num_classes = len(set(y_classes_flat))
+    # Convert to class indices if one-hot encoded
+    if y_classes_train.ndim > 1:
+        y_classes_train = np.argmax(y_classes_train, axis=1)
+    if y_classes_valid.ndim > 1:
+        y_classes_valid = np.argmax(y_classes_valid, axis=1)
+
+    # Count unique class labels
+    num_classes = len(np.unique(y_classes_train))
+
+    # One-hot encode labels properly
+    y_classes_train = tf.keras.utils.to_categorical(
+        y_classes_train, num_classes=num_classes)
+    y_classes_valid = tf.keras.utils.to_categorical(
+        y_classes_valid, num_classes=num_classes)
+
     print(f"Number of Classes: {num_classes}")
 
-    # Step 5: Define model configuration (can be customized)
+    # Model configuration
     config = [
-        {"convolutionalLayer_filters": 32, "convolutionalLayer_kernelSize": (3, 3), "convolutionalLayer_strides": (1, 1),
-         "convolutionalLayer_padding": "same", "convolutionalLayer_activation": "relu"},
-        {"poolingLayer_poolSize": (2, 2), "poolingLayer_strides": (
-            2, 2), "poolingLayer_padding": "same"},
-        {"convolutionalLayer_filters": 64, "convolutionalLayer_kernelSize": (3, 3), "convolutionalLayer_strides": (1, 1),
-         "convolutionalLayer_padding": "same", "convolutionalLayer_activation": "relu"},
-        {"flattenLayer": True},
         {"denseLayer_units": 128, "denseLayer_activation": "relu"},
         {"dropoutLayer_rate": 0.5}
     ]
 
-    # Step 6: Build the model using ConstructDLOD class
+    # Build model
     model_builder = ConstructDLOD()
     model = model_builder.construct(
-        config, input_shape=(5000,), num_classes=num_classes)
+        config, input_shape=min_feature_size, num_classes=num_classes)
 
-    # Step 7: Train the model
-    train_model(model, X_features, y_classes, y_boxes, epochs=10)
+    # Compile model
+    model.compile(
+        optimizer=Adam(),
+        loss={"class_output": "categorical_crossentropy",
+              "bbox_output": "mean_squared_error"},
+        metrics={"class_output": "accuracy", "bbox_output": "mae"}
+    )
 
-    # Step 8: Save the model (optional)
-    model.save("object_detector_from_scratch.h5")
-    print("Model saved as 'object_detector_from_scratch.h5'")
+    # Train model with explicit validation data
+    model.fit(
+        X_features_train, {"class_output": y_classes_train,
+                           "bbox_output": y_boxes_train},
+        validation_data=(X_features_valid, {
+                         "class_output": y_classes_valid, "bbox_output": y_boxes_valid}),
+        epochs=100,
+        batch_size=16
+    )
 
 
 if __name__ == "__main__":
