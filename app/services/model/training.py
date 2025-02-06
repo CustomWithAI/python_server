@@ -88,7 +88,64 @@ class MLTraining():
 
         return np.array(images), np.array(labels), class_dict
 
-    def load_dataset_featex(self, folder_path, hog_params=None, sift_params=None, orb_params=None):
+    def check_min_feat(self, folder_path, hog_params=None, sift_params=None, orb_params=None):
+        hog_count = []
+        sift_count = []
+        orb_count = []
+
+        # Check maximum feature
+        for label in os.listdir(folder_path):
+            label_path = os.path.join(folder_path, label)
+            if not os.path.isdir(label_path):
+                continue
+
+            for file in os.listdir(label_path):
+                file_path = os.path.join(label_path, file)
+                if file_path.endswith(".DS_Store"):
+                    continue
+
+                image = cv2.imread(file_path)
+                if image is None:
+                    continue
+
+                # Extract features only if params are provided
+
+                if hog_params:  # Check if HOG config exists
+                    hog_features = feature_extractor.extract_hog_features(
+                        image, **hog_params, count_feat=False)
+                    # print("HOG FEAT LEN:", hog_features.shape)
+                    hog_count.append(len(hog_features))
+
+                if sift_params:  # Check if SIFT config exists
+                    sift_features = feature_extractor.extract_sift_features(
+                        image, **sift_params, count_feat=False)
+                    # print("SIFT FEAT LEN:", len(sift_features))
+                    sift_count.append(len(sift_features))
+
+                if orb_params:  # Check if ORB config exists
+                    orb_features = feature_extractor.extract_orb_features(
+                        image, **orb_params, count_feat=False)
+                    # print("ORB FEAT LEN:", len(orb_features))
+                    orb_count.append(len(orb_features))
+
+        if hog_params:
+            hog_min = min(hog_count)
+        else:
+            hog_min = 0
+
+        if sift_params:
+            sift_min = min(sift_count)
+        else:
+            sift_min = 0
+
+        if orb_params:
+            orb_min = min(orb_count)
+        else:
+            orb_min = 0
+        print("MIN FEAT:", hog_min, sift_min, orb_min)
+        return hog_min, sift_min, orb_min
+
+    def load_dataset_featex(self, folder_path, hog_min, sift_min, orb_min, hog_params=None, sift_params=None, orb_params=None):
         X, y = [], []
 
         for label in os.listdir(folder_path):
@@ -109,26 +166,27 @@ class MLTraining():
                 feature_vector = []
 
                 if hog_params:  # Check if HOG config exists
-                    # print("doing HOG")
                     hog_features = feature_extractor.extract_hog_features(
-                        image, **hog_params)
+                        image, **hog_params, max_features=hog_min)
                     feature_vector.append(hog_features)
+                    # print("HOG FEAT LEN:", len(hog_features))
 
                 if sift_params:  # Check if SIFT config exists
-                    # print("doing SIFT")
                     sift_features = feature_extractor.extract_sift_features(
-                        image, **sift_params)
+                        image, **sift_params, max_features=sift_min)
                     feature_vector.append(sift_features)
+                    # print("SIFT FEAT LEN:", len(sift_features))
 
                 if orb_params:  # Check if ORB config exists
-                    # print("doing ORB")
                     orb_features = feature_extractor.extract_orb_features(
-                        image, **orb_params)
+                        image, **orb_params, max_features=orb_min)
                     feature_vector.append(orb_features)
+                    # print("ORB FEAT LEN:", len(orb_features))
 
                 # Flatten the feature vector if any features were extracted
                 if feature_vector:
                     feature_vector = np.hstack(feature_vector)
+                    # print("feature Vector:", feature_vector.shape)
                     X.append(feature_vector)
                     y.append(label)
                 else:
@@ -140,25 +198,36 @@ class MLTraining():
     def training_ml_cls(self, config_model, config_featex):
         model = None
         # Load dataset
-        if not config_featex:  # Use 'if not' instead of 'config_featex == {}'
+        if not config_featex:
             X_train, y_train, class_dict = self.load_dataset('dataset/train')
             X_val, y_val, _ = self.load_dataset('dataset/valid')
         else:
-            # Extract parameters (no need for json.loads)
             hog_params = config_featex["hog"]
             sift_params = config_featex["sift"]
             orb_params = config_featex["orb"]
 
+            # Find min Features
+            hog_min_train, sift_min_train, orb_min_train = self.check_min_feat(
+                'dataset/train', hog_params, sift_params, orb_params)
+            hog_min_val, sift_min_val, orb_min_val = self.check_min_feat(
+                'dataset/valid', hog_params, sift_params, orb_params)
+
+            hog_min = min(hog_min_train, hog_min_val)
+            sift_min = min(sift_min_train, sift_min_val)
+            orb_min = min(orb_min_train, orb_min_val)
+
             # Load datasets
             X_train, y_train = self.load_dataset_featex(
-                'dataset/train', hog_params, sift_params, orb_params)
+                'dataset/train', hog_min, sift_min, orb_min, hog_params, sift_params, orb_params)
             X_val, y_val = self.load_dataset_featex(
-                'dataset/valid', hog_params, sift_params, orb_params)
+                'dataset/valid', hog_min, sift_min, orb_min, hog_params, sift_params, orb_params)
 
             # Encode labels
             encoder = LabelEncoder()
             y_train = encoder.fit_transform(y_train)
             y_val = encoder.transform(y_val)
+            print(
+                f"Train shape: {X_train.shape}, Validation shape: {X_val.shape}")
 
         model = mlmodel.create_ml_model(config_model)
         model.fit(X_train, y_train)
@@ -480,20 +549,87 @@ class ConstructTraining():
     def train_cls(self, config_model, config_training, config_featex):
         model = None
         # Load dataset
-        if not config_featex:
-            X_train, y_train, class_dict, input_shape = self.load_dataset_cls(
-                'dataset/train')
-            X_val, y_val, _, _ = self.load_dataset_cls(
-                'dataset/valid', class_dict)
-        else:
-            X_train, y_train = self.load_dataset_cls_featex('dataset/train')
-            X_val, y_val = self.load_dataset_cls_featex('dataset/valid')
-            X_train, y_train = feature_extractor.feature_extraction_con_cls(
-                X_train, y_train, config_featex)
-            X_val, y_val = feature_extractor.feature_extraction_con_cls(
-                X_val, y_val, config_featex)
+        X_train, y_train, class_dict, input_shape = self.load_dataset_cls(
+            'dataset/train')
+        X_val, y_val, _, _ = self.load_dataset_cls(
+            'dataset/valid', class_dict)
 
-            input_shape = (X_train.shape[1],)
+        # Create model
+        model = constructdl_cls.construct(config_model, input_shape)
+
+        # Unpack training configuration
+        learning_rate = config_training[0]
+        learning_rate_scheduler = config_training[1]
+        momentum = config_training[2]
+        optimizer_type = config_training[3]
+        batch_size = config_training[4]
+        epochs = config_training[5]
+        loss_function = get_loss(config_training[6])
+
+        # Select optimizer
+        if optimizer_type == 'adam':
+            optimizer = Adam(learning_rate=learning_rate)
+        elif optimizer_type == 'sgd':
+            optimizer = SGD(learning_rate=learning_rate, momentum=momentum)
+        else:
+            raise ValueError("Unsupported optimizer type")
+
+        # Compile model
+        model.compile(optimizer=optimizer, loss=loss_function,
+                      metrics=['accuracy'])
+
+        # Callbacks
+        callbacks = []
+        if learning_rate_scheduler:
+            def scheduler(epoch, lr):
+                return learning_rate_scheduler(epoch, lr)
+            callbacks.append(LearningRateScheduler(scheduler))
+
+        # Train the model
+        history = model.fit(X_train, y_train, validation_data=(
+            X_val, y_val), epochs=epochs, batch_size=batch_size, callbacks=callbacks)
+
+        return history
+
+    def train_cls_featex(self, config_model, config_training, config_featex):
+        print("DOING FEATEX")
+        model = None
+        hog_params = config_featex["hog"]
+        sift_params = config_featex["sift"]
+        orb_params = config_featex["orb"]
+
+        # Find min Features
+        hog_min_train, sift_min_train, orb_min_train = MLTraining().check_min_feat(
+            'dataset/train', hog_params, sift_params, orb_params)
+        hog_min_val, sift_min_val, orb_min_val = MLTraining().check_min_feat(
+            'dataset/valid', hog_params, sift_params, orb_params)
+
+        hog_min = min(hog_min_train, hog_min_val)
+        sift_min = min(sift_min_train, sift_min_val)
+        orb_min = min(orb_min_train, orb_min_val)
+
+        print("MIN FEAT", hog_min, sift_min, orb_min)
+
+        # Load datasets
+        X_train, y_train = MLTraining().load_dataset_featex(
+            'dataset/train', hog_min, sift_min, orb_min, hog_params, sift_params, orb_params)
+        X_val, y_val = MLTraining().load_dataset_featex(
+            'dataset/valid', hog_min, sift_min, orb_min, hog_params, sift_params, orb_params)
+
+        # Encode labels
+        encoder = LabelEncoder()
+        y_train = encoder.fit_transform(y_train)
+        y_val = encoder.transform(y_val)
+
+        # Convert labels to one-hot encoding
+        num_classes = len(set(y_train))
+        y_train = to_categorical(y_train, num_classes)
+        y_val = to_categorical(y_val, num_classes)
+
+        print(
+            f"Train shape: {X_train.shape}, Validation shape: {X_val.shape}")
+
+        input_shape = ((hog_min+sift_min+orb_min),)
 
         # Create model
         model = constructdl_cls.construct(config_model, input_shape)
@@ -647,25 +783,9 @@ class ConstructTraining():
         annotation_files = [f.replace('.jpg', '.txt') for f in image_files]
         return image_files, annotation_files
 
-    def load_data_od_featex(self, dataset_path, image_files, annotation_files, img_size, config_featex):
+    def load_data_od_featex(self, dataset_path, image_files, annotation_files, img_size, hog_params, hog_min, sift_params, sift_min, orb_params, orb_min):
         """Loads and processes images, extracting features and annotations."""
-        X_features, X_images, y_boxes, y_classes = [], [], [], []
-        min_feature_size = float('inf')  # Initialize with a large value
-
-        # First pass to determine the minimum feature size
-        feature_sizes = []
-        for img_file in image_files:
-            img_path = os.path.join(dataset_path, img_file)
-
-            # Load image
-            image = cv2.imread(img_path)
-
-            # Extract features without truncation
-            features = feature_extractor.extract_features_con_od(
-                image, fixed_size=None, config_featex=config_featex)
-            feature_sizes.append(features.shape[0])
-
-        min_feature_size = min(feature_sizes)  # Find smallest feature size
+        X_features, y_boxes, y_classes = [], [], []
 
         # Second pass to extract features with fixed size
         for img_file, ann_file in zip(image_files, annotation_files):
@@ -674,12 +794,28 @@ class ConstructTraining():
 
             # Load image
             image = cv2.imread(img_path)
-            features = feature_extractor.extract_features_con_od(
-                image, fixed_size=min_feature_size, config_featex=config_featex)
-            image = image / 255.0  # Normalize after feature extraction
 
-            X_features.append(features)
-            X_images.append(image)
+            feature_vector = []
+
+            if hog_params:  # Check if HOG config exists
+                hog_features = feature_extractor.extract_hog_features(
+                    image, **hog_params, max_features=hog_min)
+                feature_vector.append(hog_features)
+
+            if sift_params:  # Check if SIFT config exists
+                sift_features = feature_extractor.extract_sift_features(
+                    image, **sift_params, max_features=sift_min)
+                feature_vector.append(sift_features)
+
+            if orb_params:  # Check if ORB config exists
+                orb_features = feature_extractor.extract_orb_features(
+                    image, **orb_params, max_features=orb_min)
+                feature_vector.append(orb_features)
+
+            # Flatten the feature vector if any features were extracted
+            if feature_vector:
+                feature_vector = np.hstack(feature_vector)
+                X_features.append(feature_vector)
 
             # Read annotation file
             with open(ann_path, "r") as f:
@@ -698,7 +834,57 @@ class ConstructTraining():
                     y_boxes.append([x_center, y_center, width, height])
                     y_classes.append(class_id)
 
-        return np.array(X_features), np.array(X_images), np.array(y_boxes), np.array(y_classes), min_feature_size
+        return np.array(X_features), np.array(y_boxes), np.array(y_classes)
+
+    def check_min_feat_od(self, folder_path, hog_params=None, sift_params=None, orb_params=None):
+        hog_count = []
+        sift_count = []
+        orb_count = []
+
+        for file in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, file)
+            if file_path.endswith(".DS_Store"):
+                continue
+
+            image = cv2.imread(file_path)
+            if image is None:
+                continue
+
+            # Extract features only if params are provided
+            if hog_params:  # Check if HOG config exists
+                hog_features = feature_extractor.extract_hog_features(
+                    image, **hog_params, count_feat=False)
+                print("HOG FEAT LEN:", hog_features.shape)
+                hog_count.append(len(hog_features))
+
+            if sift_params:  # Check if SIFT config exists
+                sift_features = feature_extractor.extract_sift_features(
+                    image, **sift_params, count_feat=False)
+                print("SIFT FEAT LEN:", len(sift_features))
+                sift_count.append(len(sift_features))
+
+            if orb_params:  # Check if ORB config exists
+                orb_features = feature_extractor.extract_orb_features(
+                    image, **orb_params, count_feat=False)
+                print("ORB FEAT LEN:", len(orb_features))
+                orb_count.append(len(orb_features))
+
+        if hog_params:
+            hog_min = min(hog_count)
+        else:
+            hog_min = 0
+
+        if sift_params:
+            sift_min = min(sift_count)
+        else:
+            sift_min = 0
+
+        if orb_params:
+            orb_min = min(orb_count)
+        else:
+            orb_min = 0
+        print("MIN FEAT:", hog_min, sift_min, orb_min)
+        return hog_min, sift_min, orb_min
 
     def train_od_featex(self, config_model, config_training, config_featex):
         # Check image size
@@ -711,17 +897,31 @@ class ConstructTraining():
         img_size = img_shape[1]
         print(f"Image size: {img_size}")
 
+        hog_params = config_featex["hog"]
+        sift_params = config_featex["sift"]
+        orb_params = config_featex["orb"]
+        print(hog_params, sift_params, orb_params)
+
+        # Check minimum features
+        hog_min_train, sift_min_train, orb_min_train = self.check_min_feat_od(
+            'dataset/train', hog_params, sift_params, orb_params)
+        hog_min_val, sift_min_val, orb_min_val = self.check_min_feat_od(
+            'dataset/valid', hog_params, sift_params, orb_params)
+        hog_min = min(hog_min_train, hog_min_val)
+        sift_min = min(sift_min_train, sift_min_val)
+        orb_min = min(orb_min_train, orb_min_val)
+
         # Load training data
         train_image_files, train_annotation_files = self.get_image_paths(
             "dataset/train")
-        X_features_train, X_images_train, y_boxes_train, y_classes_train, min_feature_size = self.load_data_od_featex(
-            "dataset/train", train_image_files, train_annotation_files, img_size, config_featex=config_featex)
+        X_features_train, y_boxes_train, y_classes_train = self.load_data_od_featex(
+            "dataset/train", train_image_files, train_annotation_files, img_size, hog_params, hog_min, sift_params, sift_min, orb_params, orb_min)
 
         # Load validation data
         valid_image_files, valid_annotation_files = self.get_image_paths(
             "dataset/valid")
-        X_features_valid, X_images_valid, y_boxes_valid, y_classes_valid, _ = self.load_data_od_featex(
-            "dataset/valid", valid_image_files, valid_annotation_files, img_size, config_featex=config_featex)
+        X_features_valid, y_boxes_valid, y_classes_valid = self.load_data_od_featex(
+            "dataset/valid", valid_image_files, valid_annotation_files, img_size, hog_params, hog_min, sift_params, sift_min, orb_params, orb_min)
 
         # Convert to NumPy array
         y_classes_train = np.array(y_classes_train)
@@ -746,7 +946,7 @@ class ConstructTraining():
 
         # Build model
         model = constructdl_od.construct_od_featex(
-            config_model, input_shape=min_feature_size, num_classes=num_classes)
+            config_model, input_shape=(hog_min+sift_min+orb_min), num_classes=num_classes)
 
         # Unpack training configuration
         learning_rate = config_training[0]

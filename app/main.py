@@ -50,7 +50,12 @@ async def construct_model(config: str = Form(...)):
     config_model = config_dict['model']
     config_training = config_dict['training']
     config_featex = config_dict['featex']
-    constructtraining.train_cls(config_model, config_training, config_featex)
+    if not config_featex:
+        constructtraining.train_cls(
+            config_model, config_training, config_featex)
+    else:
+        constructtraining.train_cls_featex(
+            config_model, config_training, config_featex)
 
 
 @app.post("/training-dl-od-construct")
