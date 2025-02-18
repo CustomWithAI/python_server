@@ -33,7 +33,7 @@ from app.services.model.construct_od import ConstructDLOD
 from app.services.dataset.featextraction import FeatureExtraction
 mlmodel = MlModel()
 dlmodel = DlModel()
-constructdl_cls = ConstructDCLS()
+constructdl_cls = ConstructDLCLS()
 constructdl_od = ConstructDLOD()
 feature_extractor = FeatureExtraction()
 

@@ -16,17 +16,6 @@ app = FastAPI()
 async def status():
     return {"message": "server is running"}
 
-'''
-{
-    "type": "classification",
-    "preprocess": {...},
-    "feature_extraction": {...},
-    "selection": {...},
-    "augmentations": {...},
-    ...
-}
-'''
-
 
 @app.post("/training-ml")
 async def training_ml(config: str = Form(...)):
@@ -104,8 +93,6 @@ async def prepare_dataset(config: str = Form(...)):
     all_config = json.loads(config)
     config_type = all_config['type']
     config_preprocess = all_config["preprocess"]
-    config_featextraction = all_config["feature_extraction"]
-    # config_featselection = all_config["feature_selection"]
     config_augmentation = all_config["augmentation"]
 
     # TODO: Get dataset
@@ -143,13 +130,4 @@ async def prepare_dataset(config: str = Form(...)):
                 augment_dataset_seg(
                     training_path, config_augmentation["number"], config_augmentation)
 
-    # # TODO: Feature Extraction
-    # if config_featextraction != {}:
-    #     for image in dataset:
-    #         image = feature_extraction(image, config_featextraction)
-
-    # # TODO: Feature Selection
-    # if config_featselection != {}:
-    #     for image in dataset:
-    #         image = feature_selection(image, config_featextraction)
     pass

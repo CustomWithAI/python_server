@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow.keras import layers, models
 
 
-class ConstructDCLS(object):
+class ConstructDLCLS(object):
     def __init__(self):
         pass
 
