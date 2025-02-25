@@ -28,7 +28,7 @@ import os
 
 from app.services.model.ml import MlModel
 from app.services.model.dl_pretrained import DlModel
-from app.services.model.construct_cls import ConstructDCLS
+from app.services.model.construct_cls import ConstructDLCLS
 from app.services.model.construct_od import ConstructDLOD
 from app.services.dataset.featextraction import FeatureExtraction
 mlmodel = MlModel()
