@@ -5,6 +5,9 @@ import glob
 import subprocess
 from app.services.dataset.dataset import preprocess_all_dataset, augment_dataset_class, augment_dataset_obj, augment_dataset_seg
 from app.services.model.training import MLTraining, DLTrainingPretrained, ConstructTraining
+from app.models.ml import MachineLearningClassificationRequest
+from app.models.dl import DeepLearningClassification, DeepLearningYoloRequest
+
 mltraining = MLTraining()
 dltrainingpretrain = DLTrainingPretrained()
 constructtraining = ConstructTraining()
@@ -18,19 +21,13 @@ async def status():
 
 
 @app.post("/training-ml")
-async def training_ml(config: str = Form(...)):
-    config_dict = json.loads(config)
-    config_model = config_dict['model']
-    config_featex = config_dict['featex']
-    mltraining.training_ml_cls(config_model, config_featex)
+async def training_ml(config: MachineLearningClassificationRequest):
+    mltraining.training_ml_cls(config)
 
 
 @app.post("/training-dl-cls-pt")
-async def training_dl(config: str = Form(...)):
-    config_dict = json.loads(config)
-    config_model = config_dict['model']
-    config_training = config_dict['training']
-    dltrainingpretrain.train_cls(config_model, config_training)
+async def training_dl(config: DeepLearningClassification):
+    dltrainingpretrain.train_cls(config)
 
 
 @app.post("/training-dl-cls-construct")
@@ -81,11 +78,8 @@ async def create_venv():
 
 
 @app.post("/training-yolo-pt")
-async def training_yolo_pretrained(config: str = Form(...)):
-    config_dict = json.loads(config)
-    config_model = config_dict['model']
-    config_training = config_dict['training']
-    dltrainingpretrain.train_yolo(config_model, config_training)
+async def training_yolo_pretrained(config: DeepLearningYoloRequest):
+    dltrainingpretrain.train_yolo(config)
 
 
 @app.post("/dataset")

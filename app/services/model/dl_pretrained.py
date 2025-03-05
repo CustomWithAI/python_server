@@ -4,11 +4,10 @@ class DlModel:
     def __init__(self):
         pass
 
-    def create_dl_model(self,config,num_classes,input_shape):
+    def create_dl_model(self, config: str, num_classes, input_shape):
         model = None
 
         if "resnet50" in config:
-            params = config["resnet50"]
             model = ResNet50(weights=None, 
                              input_shape=input_shape,
                              classes=num_classes

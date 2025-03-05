@@ -31,6 +31,9 @@ from app.services.model.dl_pretrained import DlModel
 from app.services.model.construct_cls import ConstructDLCLS
 from app.services.model.construct_od import ConstructDLOD
 from app.services.dataset.featextraction import FeatureExtraction
+from app.models.ml import MachineLearningClassificationRequest
+from app.models.dl import DeepLearningClassification, DeepLearningYoloRequest
+
 mlmodel = MlModel()
 dlmodel = DlModel()
 constructdl_cls = ConstructDLCLS()
@@ -195,16 +198,17 @@ class MLTraining():
 
         return np.array(X), np.array(y)
 
-    def training_ml_cls(self, config_model, config_featex):
+    def training_ml_cls(self, config: MachineLearningClassificationRequest):
         model = None
         # Load dataset
-        if not config_featex:
+        if not config.featex:
             X_train, y_train, class_dict = self.load_dataset('dataset/train')
             X_val, y_val, _ = self.load_dataset('dataset/valid')
         else:
-            hog_params = config_featex["hog"]
-            sift_params = config_featex["sift"]
-            orb_params = config_featex["orb"]
+            config_featex = config.featex
+            hog_params = config_featex.hog.model_dump() if config_featex.hog else {}
+            sift_params = config_featex.sift.model_dump() if config_featex.sift else {}
+            orb_params = config_featex.orb.model_dump() if config_featex.orb else {}
 
             # Find min Features
             hog_min_train, sift_min_train, orb_min_train = self.check_min_feat(
@@ -229,7 +233,7 @@ class MLTraining():
             print(
                 f"Train shape: {X_train.shape}, Validation shape: {X_val.shape}")
 
-        model = mlmodel.create_ml_model(config_model)
+        model = mlmodel.create_ml_model(config.model)
         model.fit(X_train, y_train)
 
         # Evaluate on validation data
@@ -381,7 +385,7 @@ class DLTrainingPretrained():
 
         print("Dataset has been reformatted and cloned to:", target_dir)
 
-    def train_yolo(self, config_model, config_training):
+    def train_yolo(self, config: DeepLearningYoloRequest):
         # Clone dataset to the training folder
         self.reformat_dataset("dataset", "yolo_dataset")
 
@@ -390,37 +394,39 @@ class DLTrainingPretrained():
 
         # Extract config training
         img_size = self.get_image_shape("./dataset/train/")
-        batch_size = config_training[0]
-        epochs = config_training[1]
-        weight_size = config_training[2]
+        
+        config_training = config.training
+        batch_size = config_training.batch_size
+        epochs = config_training.epochs
+        weight_size = config_training.weight_size
 
-        if "yolov5" in config_model:
+        if "yolov5" in config.model:
             # Training model
             command = f"yolo5_venv/bin/python ./app/services/model/yolov5/train.py --img {img_size} --batch {batch_size} --epochs {epochs} --data ./data.yaml --weights {weight_size} --cache"
             subprocess.run(command, shell=True, check=True)
 
-            shutil.rmtree("./app/services/model/yolov5/runs/train")
+            shutil.rmtree("./app/services/model/yolov5/runs/train", ignore_errors=True)
 
-        if "yolov8" in config_model:
+        if "yolov8" in config.model:
             print("training yolov8")
             # TODO: Implement YOLOv8 training
             command = f"yolov8_venv/bin/yolo task=detect mode=train model={weight_size} data=./data.yaml epochs={epochs} imgsz={img_size} plots=True"
             subprocess.run(command, shell=True, check=True)
 
-            shutil.rmtree("./runs/")
+            shutil.rmtree("./runs/" , ignore_errors=True)
 
-        if "yolov11" in config_model:
+        if "yolov11" in config.model:
             # TODO: Implement YOLOv11 training
             command = f"yolov11_venv/bin/yolo task=detect mode=train model={weight_size} data=./data.yaml epochs={epochs} imgsz={img_size} plots=True"
             subprocess.run(command, shell=True, check=True)
 
-            shutil.rmtree("./runs/")
+            shutil.rmtree("./runs/", ignore_errors=True)
 
         shutil.rmtree("yolo_dataset/train")
         shutil.rmtree("yolo_dataset/test")
         shutil.rmtree("yolo_dataset/valid")
 
-    def train_cls(self, config_model, config_training):
+    def train_cls(self, config: DeepLearningClassification):
         model = None
 
         # Load dataset
@@ -431,23 +437,19 @@ class DLTrainingPretrained():
         num_classes = len(class_dict)
 
         # Create model
-        model = dlmodel.create_dl_model(config_model, num_classes, input_shape)
+        model = dlmodel.create_dl_model(config.model, num_classes, input_shape)
 
         # Unpack training configuration
-        learning_rate = config_training[0]
-        learning_rate_scheduler = config_training[1]
-        momentum = config_training[2]
-        optimizer_type = config_training[3]
-        batch_size = config_training[4]
-        epochs = config_training[5]
+        config_training = config.training
+
         # Convert string to loss function
-        loss_function = get_loss(config_training[6])
+        loss_function = get_loss(config_training.loss_function)
 
         # Select optimizer
-        if optimizer_type == 'adam':
-            optimizer = Adam(learning_rate=learning_rate)
-        elif optimizer_type == 'sgd':
-            optimizer = SGD(learning_rate=learning_rate, momentum=momentum)
+        if config_training.optimizer_type == 'adam':
+            optimizer = Adam(learning_rate=config_training.learning_rate)
+        elif config_training.optimizer_type == 'sgd':
+            optimizer = SGD(learning_rate=config_training.learning_rate, momentum=config_training.momentum)
         else:
             raise ValueError("Unsupported optimizer type")
 
@@ -457,14 +459,14 @@ class DLTrainingPretrained():
 
         # Learning rate scheduler (optional)
         callbacks = []
-        if learning_rate_scheduler:
+        if config_training.learning_rate_scheduler:
             def scheduler(epoch, lr):
-                return learning_rate_scheduler(epoch, lr)
+                return config_training.learning_rate_scheduler(epoch, lr)
             callbacks.append(LearningRateScheduler(scheduler))
 
         # Train the model
         history = model.fit(X_train, y_train, validation_data=(
-            X_val, y_val), epochs=epochs, batch_size=batch_size, callbacks=callbacks)
+            X_val, y_val), epochs=config_training.epochs, batch_size=config_training.batch_size, callbacks=callbacks)
 
         return history
 
