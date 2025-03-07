@@ -22,7 +22,7 @@ from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
 from tensorflow.keras.utils import to_categorical, load_img, img_to_array, Sequence
 from tensorflow.keras import layers, models
 from sklearn.preprocessing import LabelEncoder
-
+import joblib
 import numpy as np
 import os
 
@@ -242,6 +242,9 @@ class MLTraining():
         model = mlmodel.create_ml_model(config.model)
         model.fit(X_train, y_train)
 
+        # Save the model
+        joblib.dump(model, "ml_model.pkl")
+
         # Evaluate on validation data
         y_val_pred = model.predict(X_val)
         val_accuracy = accuracy_score(y_val, y_val_pred)
@@ -400,7 +403,7 @@ class DLTrainingPretrained():
 
         # Extract config training
         img_size = self.get_image_shape("./dataset/train/")
-        
+
         config_training = config.training
         batch_size = config_training.batch_size
         epochs = config_training.epochs
@@ -411,7 +414,8 @@ class DLTrainingPretrained():
             command = f"yolo5_venv/bin/python ./app/services/model/yolov5/train.py --img {img_size} --batch {batch_size} --epochs {epochs} --data ./data.yaml --weights {weight_size} --cache"
             subprocess.run(command, shell=True, check=True)
 
-            shutil.rmtree("./app/services/model/yolov5/runs/train", ignore_errors=True)
+            shutil.rmtree("./app/services/model/yolov5/runs/train",
+                          ignore_errors=True)
 
         if "yolov8" in config.model:
             print("training yolov8")
@@ -419,7 +423,7 @@ class DLTrainingPretrained():
             command = f"yolov8_venv/bin/yolo task=detect mode=train model={weight_size} data=./data.yaml epochs={epochs} imgsz={img_size} plots=True"
             subprocess.run(command, shell=True, check=True)
 
-            shutil.rmtree("./runs/" , ignore_errors=True)
+            shutil.rmtree("./runs/", ignore_errors=True)
 
         if "yolov11" in config.model:
             # TODO: Implement YOLOv11 training
@@ -455,7 +459,8 @@ class DLTrainingPretrained():
         if config_training.optimizer_type == 'adam':
             optimizer = Adam(learning_rate=config_training.learning_rate)
         elif config_training.optimizer_type == 'sgd':
-            optimizer = SGD(learning_rate=config_training.learning_rate, momentum=config_training.momentum)
+            optimizer = SGD(learning_rate=config_training.learning_rate,
+                            momentum=config_training.momentum)
         else:
             raise ValueError("Unsupported optimizer type")
 
@@ -574,7 +579,8 @@ class ConstructTraining():
         if config_training.optimizer_type == 'adam':
             optimizer = Adam(learning_rate=config_training.learning_rate)
         elif config_training.optimizer_type == 'sgd':
-            optimizer = SGD(learning_rate=config_training.learning_rate, momentum=config_training.momentum)
+            optimizer = SGD(learning_rate=config_training.learning_rate,
+                            momentum=config_training.momentum)
         else:
             raise ValueError("Unsupported optimizer type")
 
@@ -648,7 +654,8 @@ class ConstructTraining():
         if config_training.optimizer_type == 'adam':
             optimizer = Adam(learning_rate=config_training.learning_rate)
         elif config_training.optimizer_type == 'sgd':
-            optimizer = SGD(learning_rate=config_training.learning_rate, momentum=config_training.momentum)
+            optimizer = SGD(learning_rate=config_training.learning_rate,
+                            momentum=config_training.momentum)
         else:
             raise ValueError("Unsupported optimizer type")
 
@@ -724,7 +731,8 @@ class ConstructTraining():
         if config_training.optimizer_type == 'adam':
             optimizer = Adam(learning_rate=config_training.learning_rate)
         elif config_training.optimizer_type == 'sgd':
-            optimizer = SGD(learning_rate=config_training.learning_rate, momentum=config_training.momentum)
+            optimizer = SGD(learning_rate=config_training.learning_rate,
+                            momentum=config_training.momentum)
         else:
             raise ValueError("Unsupported optimizer type")
 
@@ -954,7 +962,8 @@ class ConstructTraining():
         if config_training.optimizer_type == 'adam':
             optimizer = Adam(learning_rate=config_training.learning_rate)
         elif config_training.optimizer_type == 'sgd':
-            optimizer = SGD(learning_rate=config_training.learning_rate, momentum=config_training.momentum)
+            optimizer = SGD(learning_rate=config_training.learning_rate,
+                            momentum=config_training.momentum)
         else:
             raise ValueError("Unsupported optimizer type")
 

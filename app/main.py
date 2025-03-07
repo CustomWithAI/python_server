@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Form
+from fastapi import FastAPI, Form, UploadFile
 import json
 import os
 import glob
@@ -14,6 +14,7 @@ from app.models.dl import (
     DeepLearningObjectDetectionConstructRequest,
 )
 from app.models.dataset import DatasetConfig
+from app.services.model.use_model import UseModel
 
 mltraining = MLTraining()
 dltrainingpretrain = DLTrainingPretrained()
@@ -116,3 +117,19 @@ async def prepare_dataset(config: DatasetConfig):
                     training_path, config_augmentation["number"], config_augmentation)
 
     pass
+
+
+@app.post("/use-model")
+async def use_all_model(img: UploadFile, config: str = Form(...)):
+    convert_config = json.loads(config)
+    model_type = convert_config["model"]
+    convert_img = await img.read()
+
+    usemodel = UseModel()
+
+    if model_type == "ml":
+        prediction = usemodel.use_ml(convert_img)
+        # Convert to JSON serializable format
+        return {"prediction": prediction.tolist()}
+
+    return {"error": "Invalid model type"}
