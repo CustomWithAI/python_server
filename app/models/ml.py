@@ -4,29 +4,29 @@ from typing import Optional, Literal
 from app.models.feature_extraction import FeatureExtractionConfig
 
 class DecisionTrees(BaseModel):
-    max_depth: Optional[int] = None
-    min_samples_split: float | int
-    min_samples_leaf: float | int
-    max_features: Optional[float | int | Literal['auto', 'sqrt', 'log2']] = None
-    criterion: Literal['gini', 'entropy', 'log_loss']
+    max_depth: int = 5
+    min_samples_split: float | int = 2
+    min_samples_leaf: float | int = 1
+    max_features: float | int | Literal['auto', 'sqrt', 'log2'] = 'sqrt'
+    criterion: Literal['gini', 'entropy', 'log_loss'] = 'gini'
 
 class RandomForest(BaseModel):
-    n_estimators: int
-    max_depth: Optional[int] = None
-    min_samples_split: float | int
-    min_samples_leaf: float | int
-    max_features: float | int | Literal['sqrt', 'log2']
+    n_estimators: int = 100
+    max_depth: int = 10
+    min_samples_split: float | int = 2
+    min_samples_leaf: float | int = 1
+    max_features: float | int | Literal['sqrt', 'log2'] = 'sqrt'
 
 class SVM(BaseModel):
-    kernel: Literal['linear', 'poly', 'rbf', 'sigmoid', 'precomputed']
-    gamma: float | Literal['scale', 'auto']
-    degree: int
+    kernel: Literal['linear', 'poly', 'rbf', 'sigmoid', 'precomputed'] = 'rbf'
+    gamma: float | Literal['scale', 'auto'] = 'scale'
+    degree: int = 3
 
 class KNN(BaseModel):
-    n_neighbors: int
-    weights: Optional[Literal['uniform', 'distance']]
-    algorithm: Literal['auto', 'ball_tree', 'kd_tree', 'brute']
-    leaf_size: int
+    n_neighbors: int = 5
+    weights: Literal['uniform', 'distance'] = 'uniform'
+    algorithm: Literal['auto', 'ball_tree', 'kd_tree', 'brute'] = 'auto'
+    leaf_size: int = 30
 
 class MachineLearningModel(BaseModel):
     decision_trees: Optional[DecisionTrees] = None
@@ -47,4 +47,4 @@ class MachineLearningModel(BaseModel):
 
 class MachineLearningClassificationRequest(BaseModel):
     model: MachineLearningModel
-    featex: Optional[FeatureExtractionConfig]
+    featex: Optional[FeatureExtractionConfig] = None

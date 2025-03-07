@@ -32,7 +32,13 @@ from app.services.model.construct_cls import ConstructDLCLS
 from app.services.model.construct_od import ConstructDLOD
 from app.services.dataset.featextraction import FeatureExtraction
 from app.models.ml import MachineLearningClassificationRequest
-from app.models.dl import DeepLearningClassification, DeepLearningYoloRequest
+from app.models.dl import (
+    DeepLearningClassification,
+    DeepLearningYoloRequest,
+    DeepLearningClassificationConstruct,
+    DeepLearningObjectDetectionConstruct,
+    DeepLearningObjectDetectionConstructFeatex,
+)
 
 mlmodel = MlModel()
 dlmodel = DlModel()
@@ -206,9 +212,9 @@ class MLTraining():
             X_val, y_val, _ = self.load_dataset('dataset/valid')
         else:
             config_featex = config.featex
-            hog_params = config_featex.hog.model_dump() if config_featex.hog else {}
-            sift_params = config_featex.sift.model_dump() if config_featex.sift else {}
-            orb_params = config_featex.orb.model_dump() if config_featex.orb else {}
+            hog_params = config_featex.hog.model_dump() if config_featex.hog else None
+            sift_params = config_featex.sift.model_dump() if config_featex.sift else None
+            orb_params = config_featex.orb.model_dump() if config_featex.orb else None
 
             # Find min Features
             hog_min_train, sift_min_train, orb_min_train = self.check_min_feat(
@@ -548,7 +554,7 @@ class ConstructTraining():
         print(f"Total Samples Loaded from {dataset_path}: {len(y)}")
         return X, y
 
-    def train_cls(self, config_model, config_training, config_featex):
+    def train_cls(self, config: DeepLearningClassificationConstruct):
         model = None
         # Load dataset
         X_train, y_train, class_dict, input_shape = self.load_dataset_cls(
@@ -557,22 +563,18 @@ class ConstructTraining():
             'dataset/valid', class_dict)
 
         # Create model
-        model = constructdl_cls.construct(config_model, input_shape)
+        model = constructdl_cls.construct(config.model, input_shape)
 
         # Unpack training configuration
-        learning_rate = config_training[0]
-        learning_rate_scheduler = config_training[1]
-        momentum = config_training[2]
-        optimizer_type = config_training[3]
-        batch_size = config_training[4]
-        epochs = config_training[5]
-        loss_function = get_loss(config_training[6])
+        config_training = config.training
+
+        loss_function = get_loss(config_training.loss_function)
 
         # Select optimizer
-        if optimizer_type == 'adam':
-            optimizer = Adam(learning_rate=learning_rate)
-        elif optimizer_type == 'sgd':
-            optimizer = SGD(learning_rate=learning_rate, momentum=momentum)
+        if config_training.optimizer_type == 'adam':
+            optimizer = Adam(learning_rate=config_training.learning_rate)
+        elif config_training.optimizer_type == 'sgd':
+            optimizer = SGD(learning_rate=config_training.learning_rate, momentum=config_training.momentum)
         else:
             raise ValueError("Unsupported optimizer type")
 
@@ -582,23 +584,24 @@ class ConstructTraining():
 
         # Callbacks
         callbacks = []
-        if learning_rate_scheduler:
+        if config_training.learning_rate_scheduler:
             def scheduler(epoch, lr):
-                return learning_rate_scheduler(epoch, lr)
+                return config_training.learning_rate_scheduler(epoch, lr)
             callbacks.append(LearningRateScheduler(scheduler))
 
         # Train the model
         history = model.fit(X_train, y_train, validation_data=(
-            X_val, y_val), epochs=epochs, batch_size=batch_size, callbacks=callbacks)
+            X_val, y_val), epochs=config_training.epochs, batch_size=config_training.batch_size, callbacks=callbacks)
 
         return history
 
-    def train_cls_featex(self, config_model, config_training, config_featex):
+    def train_cls_featex(self, config: DeepLearningClassificationConstruct):
         print("DOING FEATEX")
         model = None
-        hog_params = config_featex["hog"]
-        sift_params = config_featex["sift"]
-        orb_params = config_featex["orb"]
+        config_featex = config.featex
+        hog_params = config_featex.hog.model_dump() if config_featex.hog else None
+        sift_params = config_featex.sift.model_dump() if config_featex.sift else None
+        orb_params = config_featex.orb.model_dump() if config_featex.orb else None
 
         # Find min Features
         hog_min_train, sift_min_train, orb_min_train = MLTraining().check_min_feat(
@@ -634,22 +637,18 @@ class ConstructTraining():
         input_shape = ((hog_min+sift_min+orb_min),)
 
         # Create model
-        model = constructdl_cls.construct(config_model, input_shape)
+        model = constructdl_cls.construct(config.model, input_shape)
 
         # Unpack training configuration
-        learning_rate = config_training[0]
-        learning_rate_scheduler = config_training[1]
-        momentum = config_training[2]
-        optimizer_type = config_training[3]
-        batch_size = config_training[4]
-        epochs = config_training[5]
-        loss_function = get_loss(config_training[6])
+        config_training = config.training
+
+        loss_function = get_loss(config_training.loss_function)
 
         # Select optimizer
-        if optimizer_type == 'adam':
-            optimizer = Adam(learning_rate=learning_rate)
-        elif optimizer_type == 'sgd':
-            optimizer = SGD(learning_rate=learning_rate, momentum=momentum)
+        if config_training.optimizer_type == 'adam':
+            optimizer = Adam(learning_rate=config_training.learning_rate)
+        elif config_training.optimizer_type == 'sgd':
+            optimizer = SGD(learning_rate=config_training.learning_rate, momentum=config_training.momentum)
         else:
             raise ValueError("Unsupported optimizer type")
 
@@ -659,14 +658,14 @@ class ConstructTraining():
 
         # Callbacks
         callbacks = []
-        if learning_rate_scheduler:
+        if config_training.learning_rate_scheduler:
             def scheduler(epoch, lr):
-                return learning_rate_scheduler(epoch, lr)
+                return config_training.learning_rate_scheduler(epoch, lr)
             callbacks.append(LearningRateScheduler(scheduler))
 
         # Train the model
         history = model.fit(X_train, y_train, validation_data=(
-            X_val, y_val), epochs=epochs, batch_size=batch_size, callbacks=callbacks)
+            X_val, y_val), epochs=config_training.epochs, batch_size=config_training.batch_size, callbacks=callbacks)
 
         return history
 
@@ -717,19 +716,15 @@ class ConstructTraining():
 
         return np.array(images), np.array(bboxes), class_ids
 
-    def train_od(self, config_model, config_training):
+    def train_od(self, config: DeepLearningObjectDetectionConstruct):
         # Unpack training configuration
-        learning_rate = config_training[0]
-        momentum = config_training[1]
-        optimizer_type = config_training[2]
-        batch_size = config_training[3]
-        epochs = config_training[4]
+        config_training = config.training
 
         # Select optimizer
-        if optimizer_type == 'adam':
-            optimizer = Adam(learning_rate=learning_rate)
-        elif optimizer_type == 'sgd':
-            optimizer = SGD(learning_rate=learning_rate, momentum=momentum)
+        if config_training.optimizer_type == 'adam':
+            optimizer = Adam(learning_rate=config_training.learning_rate)
+        elif config_training.optimizer_type == 'sgd':
+            optimizer = SGD(learning_rate=config_training.learning_rate, momentum=config_training.momentum)
         else:
             raise ValueError("Unsupported optimizer type")
 
@@ -748,7 +743,7 @@ class ConstructTraining():
         num_classes = line_count
 
         model = constructdl_od.construct(
-            config_model, img_shape, num_classes)
+            config.model, img_shape, num_classes)
         model.summary()
 
         # Compile the model
@@ -772,8 +767,8 @@ class ConstructTraining():
         history = model.fit(
             X_train,
             {'bbox_output': y_bboxes_train, 'class_output': y_classes_train},
-            batch_size=batch_size,
-            epochs=epochs,
+            batch_size=config_training.batch_size,
+            epochs=config_training.epochs,
             validation_data=(
                 X_valid, {'bbox_output': y_bboxes_valid, 'class_output': y_classes_valid})
         )
@@ -888,7 +883,7 @@ class ConstructTraining():
         print("MIN FEAT:", hog_min, sift_min, orb_min)
         return hog_min, sift_min, orb_min
 
-    def train_od_featex(self, config_model, config_training, config_featex):
+    def train_od_featex(self, config: DeepLearningObjectDetectionConstructFeatex):
         # Check image size
         folder_path = './dataset/train/'
         image_files = [f for f in os.listdir(
@@ -899,9 +894,11 @@ class ConstructTraining():
         img_size = img_shape[1]
         print(f"Image size: {img_size}")
 
-        hog_params = config_featex["hog"]
-        sift_params = config_featex["sift"]
-        orb_params = config_featex["orb"]
+        config_featex = config.featex
+        hog_params = config_featex.hog.model_dump() if config_featex.hog else None
+        sift_params = config_featex.sift.model_dump() if config_featex.sift else None
+        orb_params = config_featex.orb.model_dump() if config_featex.orb else None
+
         print(hog_params, sift_params, orb_params)
 
         # Check minimum features
@@ -948,20 +945,16 @@ class ConstructTraining():
 
         # Build model
         model = constructdl_od.construct_od_featex(
-            config_model, input_shape=(hog_min+sift_min+orb_min), num_classes=num_classes)
+            config.model, input_shape=(hog_min+sift_min+orb_min), num_classes=num_classes)
 
         # Unpack training configuration
-        learning_rate = config_training[0]
-        momentum = config_training[1]
-        optimizer_type = config_training[2]
-        batch_size = config_training[3]
-        epochs = config_training[4]
+        config_training = config.training
 
         # Select optimizer
-        if optimizer_type == 'adam':
-            optimizer = Adam(learning_rate=learning_rate)
-        elif optimizer_type == 'sgd':
-            optimizer = SGD(learning_rate=learning_rate, momentum=momentum)
+        if config_training.optimizer_type == 'adam':
+            optimizer = Adam(learning_rate=config_training.learning_rate)
+        elif config_training.optimizer_type == 'sgd':
+            optimizer = SGD(learning_rate=config_training.learning_rate, momentum=config_training.momentum)
         else:
             raise ValueError("Unsupported optimizer type")
 
@@ -979,8 +972,8 @@ class ConstructTraining():
                                "bbox_output": y_boxes_train},
             validation_data=(X_features_valid, {
                 "class_output": y_classes_valid, "bbox_output": y_boxes_valid}),
-            epochs=epochs,
-            batch_size=batch_size
+            epochs=config_training.epochs,
+            batch_size=config_training.batch_size
         )
 
         # Save model

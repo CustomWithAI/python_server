@@ -6,7 +6,14 @@ import subprocess
 from app.services.dataset.dataset import preprocess_all_dataset, augment_dataset_class, augment_dataset_obj, augment_dataset_seg
 from app.services.model.training import MLTraining, DLTrainingPretrained, ConstructTraining
 from app.models.ml import MachineLearningClassificationRequest
-from app.models.dl import DeepLearningClassification, DeepLearningYoloRequest
+from app.models.dl import (
+    DeepLearningClassification,
+    DeepLearningYoloRequest,
+    DeepLearningClassificationConstruct,
+    DeepLearningObjectDetectionConstructFeatex,
+    DeepLearningObjectDetectionConstructRequest,
+)
+from app.models.dataset import DatasetConfig
 
 mltraining = MLTraining()
 dltrainingpretrain = DLTrainingPretrained()
@@ -31,30 +38,19 @@ async def training_dl(config: DeepLearningClassification):
 
 
 @app.post("/training-dl-cls-construct")
-async def construct_model(config: str = Form(...)):
-    config_dict = json.loads(config)
-    config_model = config_dict['model']
-    config_training = config_dict['training']
-    config_featex = config_dict['featex']
-    if not config_featex:
-        constructtraining.train_cls(
-            config_model, config_training, config_featex)
+async def construct_model(config: DeepLearningClassificationConstruct):
+    if config.featex:
+        constructtraining.train_cls_featex(config)
     else:
-        constructtraining.train_cls_featex(
-            config_model, config_training, config_featex)
+        constructtraining.train_cls(config)
 
 
 @app.post("/training-dl-od-construct")
-async def construct_model(config: str = Form(...)):
-    config_dict = json.loads(config)
-    config_model = config_dict['model']
-    config_training = config_dict['training']
-    config_featex = config_dict['featex']
-    if not config_featex:
-        constructtraining.train_od(config_model, config_training)
+async def construct_model(config: DeepLearningObjectDetectionConstructRequest):
+    if isinstance(config, DeepLearningObjectDetectionConstructFeatex):
+        constructtraining.train_od_featex(config)
     else:
-        constructtraining.train_od_featex(
-            config_model, config_training, config_featex)
+        constructtraining.train_od(config)
 
 
 @app.post("/create_yolo_venv")
@@ -83,24 +79,19 @@ async def training_yolo_pretrained(config: DeepLearningYoloRequest):
 
 
 @app.post("/dataset")
-async def prepare_dataset(config: str = Form(...)):
-    all_config = json.loads(config)
-    config_type = all_config['type']
-    config_preprocess = all_config["preprocess"]
-    config_augmentation = all_config["augmentation"]
-
+async def prepare_dataset(config: DatasetConfig):
     # TODO: Get dataset
 
     # TODO: Preprocess images
-    if config_preprocess != {}:
+    if config.preprocess:
         print("DOING PREPROCESS")
-        dataset_dir = 'dataset'
-        preprocess_all_dataset(dataset_dir, config_preprocess)
+        dataset_dir = "dataset"
+        preprocess_all_dataset(dataset_dir, config.preprocess)
 
     # TODO: Augmentation
     if config_augmentation != {}:
         print("DOING AUGMENTATION")
-        training_path = 'dataset/train'
+        training_path = "dataset/train"
 
         # Count how many training dataset exist
         image_extensions = ['*.png', '*.jpg']

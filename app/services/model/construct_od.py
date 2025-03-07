@@ -1,54 +1,59 @@
 import tensorflow as tf
 from tensorflow.keras import layers, models
 
+from app.models.dl import (
+    DeepLearningObjectDetectionConstructModel,
+    DeepLearningObjectDetectionConstructModelFeatex,
+)
+from app.models.construct_model import *
+
 
 class ConstructDLOD(object):
     def __init__(self):
         pass
 
-    def construct(self, config, input_shape, num_classes, num_boxes=1):
+    def construct(self, config: DeepLearningObjectDetectionConstructModel, input_shape, num_classes, num_boxes=1):
         print("Received input_shape:", input_shape)
         # Ensure input shape is correct
         inputs = layers.Input(shape=input_shape)
         x = inputs
 
         for layer_config in config:
-            if "convolutionalLayer_filters" in layer_config:
+            if isinstance(layer_config, ConvolutionalLayer):
                 x = layers.Conv2D(
-                    filters=layer_config["convolutionalLayer_filters"],
+                    filters=layer_config.convolutionalLayer_filters,
                     kernel_size=eval(
-                        layer_config["convolutionalLayer_kernelSize"]),
-                    strides=eval(layer_config["convolutionalLayer_strides"]),
-                    padding=layer_config["convolutionalLayer_padding"],
-                    activation=layer_config["convolutionalLayer_activation"]
+                        layer_config.convolutionalLayer_kernelSize),
+                    strides=eval(layer_config.convolutionalLayer_strides),
+                    padding=layer_config.convolutionalLayer_padding,
+                    activation=layer_config.convolutionalLayer_activation
                 )(x)
 
-            elif "poolingLayer_poolSize" in layer_config:
-                pool_type = layer_config.get("poolingLayer_type", "MaxPool")
-                if pool_type == "MaxPool":
+            elif isinstance(layer_config, Pooling2DLayer):
+                if layer_config.poolingLayer_type == "MaxPool":
                     x = layers.MaxPooling2D(
-                        pool_size=eval(layer_config["poolingLayer_poolSize"]),
-                        strides=eval(layer_config["poolingLayer_strides"]),
-                        padding=layer_config["poolingLayer_padding"]
+                        pool_size=eval(layer_config.poolingLayer_poolSize),
+                        strides=eval(layer_config.poolingLayer_strides),
+                        padding=layer_config.poolingLayer_padding
                     )(x)
-                elif pool_type == "AvgPool":
+                elif layer_config.poolingLayer_type == "AvgPool":
                     x = layers.AveragePooling2D(
-                        pool_size=eval(layer_config["poolingLayer_poolSize"]),
-                        strides=eval(layer_config["poolingLayer_strides"]),
-                        padding=layer_config["poolingLayer_padding"]
+                        pool_size=eval(layer_config.poolingLayer_poolSize),
+                        strides=eval(layer_config.poolingLayer_strides),
+                        padding=layer_config.poolingLayer_padding
                     )(x)
 
-            elif "flattenLayer" in layer_config:
+            elif isinstance(layer_config, FlattenLayer):
                 x = layers.Flatten()(x)
 
-            elif "denseLayer_units" in layer_config:
+            elif isinstance(layer_config, DenseLayer):
                 x = layers.Dense(
-                    units=layer_config["denseLayer_units"],
-                    activation=layer_config["denseLayer_activation"]
+                    units=layer_config.denseLayer_units,
+                    activation=layer_config.denseLayer_activation
                 )(x)
 
-            elif "dropoutLayer_rate" in layer_config:
-                x = layers.Dropout(layer_config["dropoutLayer_rate"])(x)
+            elif isinstance(layer_config, DropoutLayer):
+                x = layers.Dropout(layer_config.dropoutLayer_rate)(x)
 
         # Object Detection Output Heads
         bbox_output = layers.Dense(
@@ -61,7 +66,7 @@ class ConstructDLOD(object):
 
         return model
 
-    def construct_od_featex(self, config, input_shape, num_classes, num_boxes=1):
+    def construct_od_featex(self, config: DeepLearningObjectDetectionConstructModelFeatex, input_shape, num_classes, num_boxes=1):
         print("Received input_shape:", input_shape)
 
         # Correct input shape for the feature vector
@@ -70,15 +75,15 @@ class ConstructDLOD(object):
 
         # Add dense layers based on the configuration
         for layer_config in config:
-            if "denseLayer_units" in layer_config:
+            if isinstance(layer_config, DenseLayer):
                 x = tf.keras.layers.Dense(
-                    units=layer_config["denseLayer_units"],
-                    activation=layer_config["denseLayer_activation"]
+                    units=layer_config.denseLayer_units,
+                    activation=layer_config.denseLayer_activation,
                 )(x)
 
-            elif "dropoutLayer_rate" in layer_config:
+            elif isinstance(layer_config, DropoutLayer):
                 x = tf.keras.layers.Dropout(
-                    layer_config["dropoutLayer_rate"])(x)
+                    layer_config.dropoutLayer_rate)(x)
 
         # Object Detection Output Heads (bbox and class outputs)
         bbox_output = tf.keras.layers.Dense(

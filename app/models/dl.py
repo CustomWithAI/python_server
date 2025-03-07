@@ -1,6 +1,25 @@
 from pydantic import BaseModel
-from typing import Union, Literal
-from enum import Enum
+from typing import Optional, Union, Literal, List
+
+from app.models.feature_extraction import FeatureExtractionConfig
+from app.models.construct_model import *
+
+ClassificationModels = Literal['resnet50', 'vgg16', 'mobilenetv2']
+
+ObjectDetectionModels = Literal['yolov5', 'yolov8', 'yolov11']
+
+SegmentationModels = Literal['yolov8', 'yolov11']
+
+ObjectDetectionWeightSizes = Literal[
+    "yolov5s.pt", "yolov5m.pt", "yolov5l.pt",
+    "yolov8s.pt", "yolov8m.pt", "yolov8l.pt",
+    "yolov11s.pt", "yolov11m.pt", "yolov11l.pt"
+]
+
+SegmentationWeightSizes = Literal[
+    "yolov8s.pt", "yolov8m.pt", "yolov8l.pt",
+    "yolov11s.pt", "yolov11m.pt", "yolov11l.pt"
+]
 
 class ClassificationTrainingConfig(BaseModel):
     learning_rate: float = 0.001
@@ -14,26 +33,74 @@ class ClassificationTrainingConfig(BaseModel):
 class ObjectDetectionTrainingConfig(BaseModel):
     batch_size: int = 40
     epochs: int = 1
-    weight_size: Literal['yolov5s.pt', 'm.pt', 'l.pt'] = 'yolov5s.pt'
+    weight_size: ObjectDetectionWeightSizes
 
 class SegmentationTrainingConfig(BaseModel):
     batch_size: int = 40
     epochs: int = 1
-    weight_size: Literal['yolov8s.pt', 'm.pt', 'l.pt'] = 'yolov8s.pt'
+    weight_size: SegmentationWeightSizes
+
+class ObjectDetectionConstructModelConfig(BaseModel):
+    learning_rate: float = 0.001
+    momentum: float = 0.9
+    optimizer_type: Literal['adam', 'sgd'] = 'adam'
+    batch_size: int = 8
+    epochs: int = 5
 
 class DeepLearningClassification(BaseModel):
-    type: Literal['classification'] = 'classification'
-    model: Literal['resnet50', 'vgg16', 'mobilenetv2']
+    model: ClassificationModels
     training: ClassificationTrainingConfig
 
 class DeepLearningObjectDetection(BaseModel):
     type: Literal['object_detection'] = 'object_detection'
-    model: Literal['yolov5', 'yolov8', 'yolov11']
+    model: ObjectDetectionModels
     training: ObjectDetectionTrainingConfig
 
 class DeepLearningSegmentation(BaseModel):
     type: Literal['segmentation'] = 'segmentation'
-    model: Literal['yolov8', 'yolov11']
+    model: SegmentationModels
     training: SegmentationTrainingConfig
 
 DeepLearningYoloRequest = Union[DeepLearningObjectDetection, DeepLearningSegmentation]
+
+DeepLearningClassificationConstructModel = List[Union[
+    InputLayer,
+    ConvolutionalLayer,
+    Pooling2DLayer,
+    NormalizationLayer,
+    ActivationLayer,
+    DropoutLayer,
+    DenseLayer,
+    FlattenLayer,
+]]
+
+DeepLearningObjectDetectionConstructModel = List[Union[
+    ConvolutionalLayer,
+    Pooling2DLayer,
+    FlattenLayer,
+    DenseLayer,
+    DropoutLayer,
+]]
+
+DeepLearningObjectDetectionConstructModelFeatex = List[Union[
+    DenseLayer,
+    DropoutLayer,
+]]
+
+class DeepLearningClassificationConstruct(BaseModel):
+    model: DeepLearningClassificationConstructModel
+    training: ClassificationTrainingConfig
+    featex: Optional[FeatureExtractionConfig] = None
+
+class DeepLearningObjectDetectionConstruct(BaseModel):
+    model: DeepLearningObjectDetectionConstructModel
+    training: ObjectDetectionConstructModelConfig
+class DeepLearningObjectDetectionConstructFeatex(BaseModel):
+    featex: FeatureExtractionConfig
+    model: DeepLearningObjectDetectionConstructModelFeatex
+    training: ObjectDetectionConstructModelConfig
+
+DeepLearningObjectDetectionConstructRequest = Union[
+    DeepLearningObjectDetectionConstruct,
+    DeepLearningObjectDetectionConstructFeatex
+]

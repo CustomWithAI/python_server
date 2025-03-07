@@ -5,11 +5,12 @@ import shutil
 from collections import defaultdict
 from app.services.dataset.preprocessing import Preprocessing
 from app.services.dataset.augmentation import Augmentation
+from app.models.preprocessing import ImagePreprocessingConfig
 preprocess = Preprocessing()
 augmentation = Augmentation()
 
 
-def preprocess_all_dataset(dataset_dir, config_preprocess):
+def preprocess_all_dataset(dataset_dir: str, config_preprocess: ImagePreprocessingConfig):
     for root, dirs, files in os.walk(dataset_dir):
         for file in files:
             if file.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
