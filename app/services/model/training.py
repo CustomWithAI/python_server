@@ -533,32 +533,6 @@ class ConstructTraining():
 
         return images, labels, class_dict, input_shape
 
-    def load_dataset_cls_featex(self, dataset_path):
-        print(f"Dataset Path Exists: {os.path.exists(dataset_path)}")
-        classes = [cls for cls in os.listdir(
-            dataset_path) if not cls.startswith('.')]
-        print(f"Classes Found: {classes}")
-
-        X, y = [], []
-        for label in classes:
-            class_path = os.path.join(dataset_path, label)
-            if not os.path.isdir(class_path):
-                continue
-
-            for img_name in os.listdir(class_path):
-                img_path = os.path.join(class_path, img_name)
-                img = cv2.imread(img_path)
-
-                if img is None:
-                    print(f"⚠️ Skipping: {img_path} (Image not loaded)")
-                    continue
-
-                X.append(img)
-                y.append(label)
-
-        print(f"Total Samples Loaded from {dataset_path}: {len(y)}")
-        return X, y
-
     def train_cls(self, config: DeepLearningClassificationConstruct):
         model = None
         # Load dataset
@@ -566,6 +540,9 @@ class ConstructTraining():
             'dataset/train')
         X_val, y_val, _, _ = self.load_dataset_cls(
             'dataset/valid', class_dict)
+
+        print("Input Shape", input_shape)
+        print("Class Dict", class_dict)
 
         # Create model
         model = constructdl_cls.construct(config.model, input_shape)
@@ -599,7 +576,35 @@ class ConstructTraining():
         history = model.fit(X_train, y_train, validation_data=(
             X_val, y_val), epochs=config_training.epochs, batch_size=config_training.batch_size, callbacks=callbacks)
 
+        model.save("model.h5")
+
         return history
+
+    def load_dataset_cls_featex(self, dataset_path):
+        print(f"Dataset Path Exists: {os.path.exists(dataset_path)}")
+        classes = [cls for cls in os.listdir(
+            dataset_path) if not cls.startswith('.')]
+        print(f"Classes Found: {classes}")
+
+        X, y = [], []
+        for label in classes:
+            class_path = os.path.join(dataset_path, label)
+            if not os.path.isdir(class_path):
+                continue
+
+            for img_name in os.listdir(class_path):
+                img_path = os.path.join(class_path, img_name)
+                img = cv2.imread(img_path)
+
+                if img is None:
+                    print(f"⚠️ Skipping: {img_path} (Image not loaded)")
+                    continue
+
+                X.append(img)
+                y.append(label)
+
+        print(f"Total Samples Loaded from {dataset_path}: {len(y)}")
+        return X, y
 
     def train_cls_featex(self, config: DeepLearningClassificationConstruct):
         print("DOING FEATEX")

@@ -89,34 +89,34 @@ async def prepare_dataset(config: DatasetConfig):
         dataset_dir = "dataset"
         preprocess_all_dataset(dataset_dir, config.preprocess)
 
-    # TODO: Augmentation
-    if config_augmentation != {}:
-        print("DOING AUGMENTATION")
-        training_path = "dataset/train"
+    # # TODO: Augmentation
+    # if config_augmentation != {}:
+    #     print("DOING AUGMENTATION")
+    #     training_path = "dataset/train"
 
-        # Count how many training dataset exist
-        image_extensions = ['*.png', '*.jpg']
-        image_count = 0
-        for ext in image_extensions:
-            image_count += len(glob.glob(os.path.join(training_path,
-                               '**', ext), recursive=True))
+    #     # Count how many training dataset exist
+    #     image_extensions = ['*.png', '*.jpg']
+    #     image_count = 0
+    #     for ext in image_extensions:
+    #         image_count += len(glob.glob(os.path.join(training_path,
+    #                            '**', ext), recursive=True))
 
-        total_target_number = config_augmentation["number"] - image_count
-        print("TOTAL TARGER:", total_target_number)
+    #     total_target_number = config_augmentation["number"] - image_count
+    #     print("TOTAL TARGER:", total_target_number)
 
-        # Do Augmentation
-        if total_target_number > 0:
-            if config_type == "classification":
-                augment_dataset_class(
-                    training_path, config_augmentation["number"], config_augmentation)
-            if config_type == "object_detection":
-                augment_dataset_obj(
-                    training_path, config_augmentation["number"], config_augmentation)
-            if config_type == "segmentation":
-                augment_dataset_seg(
-                    training_path, config_augmentation["number"], config_augmentation)
+    #     # Do Augmentation
+    #     if total_target_number > 0:
+    #         if config_type == "classification":
+    #             augment_dataset_class(
+    #                 training_path, config_augmentation["number"], config_augmentation)
+    #         if config_type == "object_detection":
+    #             augment_dataset_obj(
+    #                 training_path, config_augmentation["number"], config_augmentation)
+    #         if config_type == "segmentation":
+    #             augment_dataset_seg(
+    #                 training_path, config_augmentation["number"], config_augmentation)
 
-    pass
+    # pass
 
 
 @app.post("/use-model")
@@ -129,7 +129,10 @@ async def use_all_model(img: UploadFile, config: str = Form(...)):
 
     if model_type == "ml":
         prediction = usemodel.use_ml(convert_img)
-        # Convert to JSON serializable format
         return {"prediction": prediction.tolist()}
+
+    if model_type == "dl_cls":
+        prediction = usemodel.use_dl_cls(convert_img)
+        return {"prediction": int(prediction)}
 
     return {"error": "Invalid model type"}

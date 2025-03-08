@@ -8,6 +8,7 @@
 *.cache
 *.csv
 *.h5
+*.pkl
 args.yaml
 app/services/model/yolov5/
 yolo_venv/

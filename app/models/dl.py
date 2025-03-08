@@ -21,6 +21,7 @@ SegmentationWeightSizes = Literal[
     "yolov11s.pt", "yolov11m.pt", "yolov11l.pt"
 ]
 
+
 class ClassificationTrainingConfig(BaseModel):
     learning_rate: float = 0.001
     learning_rate_scheduler: None = None
@@ -30,15 +31,18 @@ class ClassificationTrainingConfig(BaseModel):
     epochs: int = 10
     loss_function: Literal['categorical_crossentropy'] = 'categorical_crossentropy'
 
+
 class ObjectDetectionTrainingConfig(BaseModel):
     batch_size: int = 40
     epochs: int = 1
     weight_size: ObjectDetectionWeightSizes
 
+
 class SegmentationTrainingConfig(BaseModel):
     batch_size: int = 40
     epochs: int = 1
     weight_size: SegmentationWeightSizes
+
 
 class ObjectDetectionConstructModelConfig(BaseModel):
     learning_rate: float = 0.001
@@ -47,21 +51,26 @@ class ObjectDetectionConstructModelConfig(BaseModel):
     batch_size: int = 8
     epochs: int = 5
 
+
 class DeepLearningClassification(BaseModel):
     model: ClassificationModels
     training: ClassificationTrainingConfig
+
 
 class DeepLearningObjectDetection(BaseModel):
     type: Literal['object_detection'] = 'object_detection'
     model: ObjectDetectionModels
     training: ObjectDetectionTrainingConfig
 
+
 class DeepLearningSegmentation(BaseModel):
     type: Literal['segmentation'] = 'segmentation'
     model: SegmentationModels
     training: SegmentationTrainingConfig
 
-DeepLearningYoloRequest = Union[DeepLearningObjectDetection, DeepLearningSegmentation]
+
+DeepLearningYoloRequest = Union[DeepLearningObjectDetection,
+                                DeepLearningSegmentation]
 
 DeepLearningClassificationConstructModel = List[Union[
     InputLayer,
@@ -87,18 +96,23 @@ DeepLearningObjectDetectionConstructModelFeatex = List[Union[
     DropoutLayer,
 ]]
 
+
 class DeepLearningClassificationConstruct(BaseModel):
     model: DeepLearningClassificationConstructModel
     training: ClassificationTrainingConfig
     featex: Optional[FeatureExtractionConfig] = None
 
+
 class DeepLearningObjectDetectionConstruct(BaseModel):
     model: DeepLearningObjectDetectionConstructModel
     training: ObjectDetectionConstructModelConfig
+
+
 class DeepLearningObjectDetectionConstructFeatex(BaseModel):
     featex: FeatureExtractionConfig
     model: DeepLearningObjectDetectionConstructModelFeatex
     training: ObjectDetectionConstructModelConfig
+
 
 DeepLearningObjectDetectionConstructRequest = Union[
     DeepLearningObjectDetectionConstruct,
