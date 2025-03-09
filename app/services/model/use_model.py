@@ -5,6 +5,11 @@ import joblib
 import math
 from io import BytesIO
 from tensorflow.keras.models import load_model
+import subprocess
+import tempfile
+from pathlib import Path
+import os
+import shutil
 
 
 class UseModel:
@@ -113,3 +118,63 @@ class UseModel:
         predicted_class = np.argmax(predictions, axis=1)[0]
 
         return predicted_class
+
+    def use_dl_od(self, img_bytes, version):
+        # Save input image to a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_img:
+            temp_img.write(img_bytes)
+            temp_img_path = temp_img.name
+
+        weight_path = "./best.pt"
+
+        # Define output directory
+        output_dir = Path("runs/detect/predict")
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        if version == "yolov8":
+            command = (
+                f"yolov8_venv/bin/yolo task=detect mode=predict model={weight_path} "
+                f"source={temp_img_path} conf=0.5 save_txt save"
+            )
+        if version == "yolov11":
+            command = (
+                f"yolov11_venv/bin/yolo task=detect mode=predict model={weight_path} "
+                f"source={temp_img_path} conf=0.5 save_txt save"
+            )
+
+        subprocess.run(command, shell=True, check=True)
+
+        # Path to the folder
+        folder_path = "./runs/detect/predict2/labels/"
+
+        # Get the list of all files in the folder
+        txt_files = [f for f in os.listdir(folder_path) if f.endswith(".txt")]
+
+        # Check if there are any .txt files
+        if txt_files:
+            # Pick the first .txt file
+            txt_file_path = os.path.join(folder_path, txt_files[0])
+
+            detections = []
+
+            # Read the content of the first .txt file found
+            with open(txt_file_path, "r") as file:
+                for line in file:
+                    parts = line.strip().split()
+                    if len(parts) == 5:
+                        class_id = int(parts[0])  # Convert class ID to int
+                        # Convert bbox values to float
+                        bbox = list(map(float, parts[1:]))
+                        detections.append({
+                            "class_id": class_id,
+                            "bbox": {
+                                "x_center": bbox[0],
+                                "y_center": bbox[1],
+                                "width": bbox[2],
+                                "height": bbox[3]
+                            }
+                        })
+
+        shutil.rmtree("./runs/detect/predict2", ignore_errors=True)
+
+        return detections

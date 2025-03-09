@@ -423,7 +423,7 @@ class DLTrainingPretrained():
             command = f"yolov8_venv/bin/yolo task=detect mode=train model={weight_size} data=./data.yaml epochs={epochs} imgsz={img_size} plots=True"
             subprocess.run(command, shell=True, check=True)
 
-            shutil.rmtree("./runs/", ignore_errors=True)
+            # shutil.rmtree("./runs/", ignore_errors=True)
 
         if "yolov11" in config.model:
             # TODO: Implement YOLOv11 training
@@ -432,10 +432,11 @@ class DLTrainingPretrained():
 
             shutil.rmtree("./runs/", ignore_errors=True)
 
-        shutil.rmtree("yolo_dataset/train")
-        shutil.rmtree("yolo_dataset/test")
-        shutil.rmtree("yolo_dataset/valid")
+        shutil.rmtree("yolo_dataset/train", ignore_errors=True)
+        shutil.rmtree("yolo_dataset/test", ignore_errors=True)
+        shutil.rmtree("yolo_dataset/valid", ignore_errors=True)
 
+# reload
     def train_cls(self, config: DeepLearningClassification):
         model = None
 

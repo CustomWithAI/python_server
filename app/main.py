@@ -3,6 +3,8 @@ import json
 import os
 import glob
 import subprocess
+import uuid
+from pathlib import Path
 from app.services.dataset.dataset import preprocess_all_dataset, augment_dataset_class, augment_dataset_obj, augment_dataset_seg
 from app.services.model.training import MLTraining, DLTrainingPretrained, ConstructTraining
 from app.models.ml import MachineLearningClassificationRequest
@@ -123,6 +125,7 @@ async def prepare_dataset(config: DatasetConfig):
 async def use_all_model(img: UploadFile, config: str = Form(...)):
     convert_config = json.loads(config)
     model_type = convert_config["model"]
+    version = convert_config["version"]
     convert_img = await img.read()
 
     usemodel = UseModel()
@@ -134,5 +137,11 @@ async def use_all_model(img: UploadFile, config: str = Form(...)):
     if model_type == "dl_cls":
         prediction = usemodel.use_dl_cls(convert_img)
         return {"prediction": int(prediction)}
+
+    if model_type == "dl_od":
+        prediction = usemodel.use_dl_od(convert_img, version)
+        return {
+            "prediction": prediction
+        }
 
     return {"error": "Invalid model type"}

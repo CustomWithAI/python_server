@@ -34,13 +34,13 @@ class ClassificationTrainingConfig(BaseModel):
 
 class ObjectDetectionTrainingConfig(BaseModel):
     batch_size: int = 40
-    epochs: int = 1
+    epochs: int = 10
     weight_size: ObjectDetectionWeightSizes
 
 
 class SegmentationTrainingConfig(BaseModel):
     batch_size: int = 40
-    epochs: int = 1
+    epochs: int = 10
     weight_size: SegmentationWeightSizes
 
 
