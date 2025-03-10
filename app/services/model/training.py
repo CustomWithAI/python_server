@@ -403,6 +403,7 @@ class DLTrainingPretrained():
 
         # Extract config training
         img_size = self.get_image_shape("./dataset/train/")
+        print("IMG SHAPE", img_size)
 
         config_training = config.training
         batch_size = config_training.batch_size
@@ -414,8 +415,7 @@ class DLTrainingPretrained():
             command = f"yolo5_venv/bin/python ./app/services/model/yolov5/train.py --img {img_size} --batch {batch_size} --epochs {epochs} --data ./data.yaml --weights {weight_size} --cache"
             subprocess.run(command, shell=True, check=True)
 
-            shutil.rmtree("./app/services/model/yolov5/runs/train",
-                          ignore_errors=True)
+            # shutil.rmtree("./app/services/model/yolov5/runs/train", ignore_errors = True)
 
         if "yolov8" in config.model:
             print("training yolov8")
@@ -430,11 +430,11 @@ class DLTrainingPretrained():
             command = f"yolov11_venv/bin/yolo task=detect mode=train model={weight_size} data=./data.yaml epochs={epochs} imgsz={img_size} plots=True"
             subprocess.run(command, shell=True, check=True)
 
-            shutil.rmtree("./runs/", ignore_errors=True)
+            # shutil.rmtree("./runs/", ignore_errors=True)
 
-        shutil.rmtree("yolo_dataset/train", ignore_errors=True)
-        shutil.rmtree("yolo_dataset/test", ignore_errors=True)
-        shutil.rmtree("yolo_dataset/valid", ignore_errors=True)
+        shutil.rmtree("./yolo_dataset/train", ignore_errors=True)
+        shutil.rmtree("./yolo_dataset/test", ignore_errors=True)
+        shutil.rmtree("./yolo_dataset/valid", ignore_errors=True)
 
 # reload
     def train_cls(self, config: DeepLearningClassification):

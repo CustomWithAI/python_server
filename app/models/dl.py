@@ -13,7 +13,7 @@ SegmentationModels = Literal['yolov8', 'yolov11']
 ObjectDetectionWeightSizes = Literal[
     "yolov5s.pt", "yolov5m.pt", "yolov5l.pt",
     "yolov8s.pt", "yolov8m.pt", "yolov8l.pt",
-    "yolov11s.pt", "yolov11m.pt", "yolov11l.pt"
+    "yolo11s.pt", "yolo11m.pt", "yolo11l.pt"
 ]
 
 SegmentationWeightSizes = Literal[

@@ -136,16 +136,23 @@ class UseModel:
                 f"yolov8_venv/bin/yolo task=detect mode=predict model={weight_path} "
                 f"source={temp_img_path} conf=0.5 save_txt save"
             )
+            folder_path = "./runs/detect/predict2/labels/"
+
         if version == "yolov11":
             command = (
                 f"yolov11_venv/bin/yolo task=detect mode=predict model={weight_path} "
                 f"source={temp_img_path} conf=0.5 save_txt save"
             )
 
-        subprocess.run(command, shell=True, check=True)
+            folder_path = "./runs/detect/predict2/labels/"
 
-        # Path to the folder
-        folder_path = "./runs/detect/predict2/labels/"
+        elif version == "yolov5":
+            command = (
+                f"yolo5_venv/bin/python ./app/services/model/yolov5/detect.py --weights {weight_path} --conf 0.09 --source {temp_img_path} --save-txt"
+            )
+            folder_path = "./app/services/model/yolov5/runs/detect/exp/labels/"
+
+        subprocess.run(command, shell=True, check=True)
 
         # Get the list of all files in the folder
         txt_files = [f for f in os.listdir(folder_path) if f.endswith(".txt")]
@@ -175,6 +182,8 @@ class UseModel:
                             }
                         })
 
+        shutil.rmtree(
+            "./app/services/model/yolov5/runs/detect/exp", ignore_errors=True)
         shutil.rmtree("./runs/detect/predict2", ignore_errors=True)
 
         return detections
