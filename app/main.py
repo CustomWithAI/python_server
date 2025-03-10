@@ -3,8 +3,8 @@ import json
 import os
 import glob
 import subprocess
-import uuid
-from pathlib import Path
+
+from typing import List
 from app.services.dataset.dataset import preprocess_all_dataset, augment_dataset_class, augment_dataset_obj, augment_dataset_seg
 from app.services.model.training import MLTraining, DLTrainingPretrained, ConstructTraining
 from app.models.ml import MachineLearningClassificationRequest
@@ -51,8 +51,6 @@ async def construct_model(config: DeepLearningClassificationConstruct):
 @app.post("/training-dl-od-construct")
 async def construct_model(config: DeepLearningObjectDetectionConstructRequest):
     if isinstance(config, DeepLearningObjectDetectionConstructFeatex):
-        # TODO: ยังบัคเรื่อง Model ไม่ตรงตาที่ Union ไว้ อาจต้องลบค่า Default ออก
-        return { "data": config.model_dump(), "msg": "featex" }
         constructtraining.train_od_featex(config)
     else:
         constructtraining.train_od(config)
@@ -82,8 +80,15 @@ async def create_venv():
 async def training_yolo_pretrained(config: DeepLearningYoloRequest):
     dltrainingpretrain.train_yolo(config)
 
-
 @app.post("/dataset")
+async def create_dataset(images: List[UploadFile]):
+    # TODO: Create dataset
+    return {
+        "message": "Dataset created successfully"
+    }
+
+
+@app.post("/dataset-config")
 async def prepare_dataset(config: DatasetConfig):
     # TODO: Get dataset
 
