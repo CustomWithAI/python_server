@@ -51,6 +51,8 @@ async def construct_model(config: DeepLearningClassificationConstruct):
 @app.post("/training-dl-od-construct")
 async def construct_model(config: DeepLearningObjectDetectionConstructRequest):
     if isinstance(config, DeepLearningObjectDetectionConstructFeatex):
+        # TODO: ยังบัคเรื่อง Model ไม่ตรงตาที่ Union ไว้ อาจต้องลบค่า Default ออก
+        return { "data": config.model_dump(), "msg": "featex" }
         constructtraining.train_od_featex(config)
     else:
         constructtraining.train_od(config)
@@ -91,34 +93,32 @@ async def prepare_dataset(config: DatasetConfig):
         dataset_dir = "dataset"
         preprocess_all_dataset(dataset_dir, config.preprocess)
 
-    # # TODO: Augmentation
-    # if config_augmentation != {}:
-    #     print("DOING AUGMENTATION")
-    #     training_path = "dataset/train"
+    # TODO: Augmentation
+    if config.augmentation and config.type:
+        print("DOING AUGMENTATION")
+        training_path = "dataset/train"
 
-    #     # Count how many training dataset exist
-    #     image_extensions = ['*.png', '*.jpg']
-    #     image_count = 0
-    #     for ext in image_extensions:
-    #         image_count += len(glob.glob(os.path.join(training_path,
-    #                            '**', ext), recursive=True))
+        # Count how many training dataset exist
+        image_extensions = ['*.png', '*.jpg']
+        image_count = 0
+        for ext in image_extensions:
+            image_count += len(glob.glob(os.path.join(training_path,
+                               '**', ext), recursive=True))
 
-    #     total_target_number = config_augmentation["number"] - image_count
-    #     print("TOTAL TARGER:", total_target_number)
+        total_target_number = config.augmentation.number - image_count
+        print("TOTAL TARGER:", total_target_number)
 
-    #     # Do Augmentation
-    #     if total_target_number > 0:
-    #         if config_type == "classification":
-    #             augment_dataset_class(
-    #                 training_path, config_augmentation["number"], config_augmentation)
-    #         if config_type == "object_detection":
-    #             augment_dataset_obj(
-    #                 training_path, config_augmentation["number"], config_augmentation)
-    #         if config_type == "segmentation":
-    #             augment_dataset_seg(
-    #                 training_path, config_augmentation["number"], config_augmentation)
-
-    # pass
+        # Do Augmentation
+        if total_target_number > 0:
+            if config.type == "classification":
+                augment_dataset_class(
+                    training_path, config.augmentation)
+            if config.type == "object_detection":
+                augment_dataset_obj(
+                    training_path, config.augmentation)
+            if config.type == "segmentation":
+                augment_dataset_seg(
+                    training_path, config.augmentation)
 
 
 @app.post("/use-model")

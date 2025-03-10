@@ -42,6 +42,3 @@ class DenseBoundingBoxOutput(BaseModel):
 class DenseClassOutput(BaseModel):
     class_output_units: int = 3
     class_output_activation: Literal['softmax'] = 'softmax'
-
-class InputLayerFeatex(BaseModel):
-    inputLayer_shape: Optional[float] = None

@@ -6,6 +6,7 @@ from collections import defaultdict
 from app.services.dataset.preprocessing import Preprocessing
 from app.services.dataset.augmentation import Augmentation
 from app.models.preprocessing import ImagePreprocessingConfig
+from app.models.augmentation import DataAugmentationConfig
 preprocess = Preprocessing()
 augmentation = Augmentation()
 
@@ -29,7 +30,7 @@ def preprocess_all_dataset(dataset_dir: str, config_preprocess: ImagePreprocessi
                     print(f"Failed to process {file_path}: {e}")
 
 
-def augment_class_images(class_path, target_number_per_class, config_augmentation):
+def augment_class_images(class_path: str, target_number_per_class: int, config_augmentation: DataAugmentationConfig):
     # Collect only original images before augmentation
     images = [os.path.join(class_path, f) for f in os.listdir(
         class_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
@@ -59,21 +60,21 @@ def augment_class_images(class_path, target_number_per_class, config_augmentatio
     images.extend(augmented_images)
 
 
-def augment_dataset_class(training_path, total_target_number, config_augmentation):
+def augment_dataset_class(training_path: str, config_augmentation: DataAugmentationConfig):
     # List all class directories
     class_dirs = [d for d in os.listdir(
         training_path) if os.path.isdir(os.path.join(training_path, d))]
     number_of_classes = len(class_dirs)
 
     # Calculate target number per class
-    target_number_per_class = total_target_number // number_of_classes
+    target_number_per_class = config_augmentation.number // number_of_classes
     for class_name in class_dirs:
         class_path = os.path.join(training_path, class_name)
         augment_class_images(
             class_path, target_number_per_class, config_augmentation)
 
 
-def augment_dataset_obj(folder_path, target_num_images, config_augmentation):
+def augment_dataset_obj(folder_path: str, config_augmentation: DataAugmentationConfig):
     # Get all images and corresponding .txt files in the folder
     image_files = [f for f in os.listdir(folder_path) if f.endswith('.jpg')]
     txt_files = [f.replace('.jpg', '.txt') for f in image_files]
@@ -150,7 +151,7 @@ def augment_dataset_obj(folder_path, target_num_images, config_augmentation):
                         f"{class_id} {x_center} {y_center} {width} {height}\n")
 
 
-def augment_dataset_seg(folder_path, target_num_images, config_augmentation):
+def augment_dataset_seg(folder_path: str, config_augmentation: DataAugmentationConfig):
     # Get all images and corresponding .txt files in the folder
     image_files = [f for f in os.listdir(folder_path) if f.endswith('.jpg')]
     txt_files = [f.replace('.jpg', '.txt') for f in image_files]

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Literal
 
 class ImagePreprocessingConfig(BaseModel):
     grayscale: Optional[bool] = Field(None, description="Convert image to grayscale.")
@@ -24,3 +24,10 @@ class ImagePreprocessingConfig(BaseModel):
     erosion: Optional[int] = Field(None, description="Morphological erosion kernel size.")
     opening: Optional[int] = Field(None, description="Morphological opening kernel size.")
     closing: Optional[int] = Field(None, description="Morphological closing kernel size.")
+    priority: List[
+        Literal[
+            'grayscale', 'resize', 'crop', 'rotate', 'flip', 'pers_trans', 'thresh_percent', 'normalize', 'histogram_equalization',
+            'sharpening', 'unsharp', 'laplacian', 'gaussian_blur','median_blur','mean_blur', 'log_trans', 'dilation', 'erosion',
+            'opening', 'closing'
+        ]
+    ]

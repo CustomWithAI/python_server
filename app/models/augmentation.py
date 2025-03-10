@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List, Literal
 
 class DataAugmentationConfig(BaseModel):
     grayscale: Optional[Tuple[float]] = Field(None, description="Convert image to grayscale.")
@@ -24,3 +24,11 @@ class DataAugmentationConfig(BaseModel):
     salt_pepper_noise: Optional[Tuple[float, Tuple[float, float]]] = Field(None, description="Add salt-and-pepper noise (Amount, Salt-vs-Pepper ratio).")
     random_erasing: Optional[Tuple[float, Tuple[int, int, int, int]]] = Field(None, description="Randomly erase a region (x, y, width, height).")
     elastic_distortion: Optional[Tuple[float, Tuple[int, int]]] = Field(None, description="Apply elastic transformation (Alpha, Sigma).")
+    number: int = Field(100, description="Number of final datasets.")
+    priority: List[
+        Literal[
+            'grayscale', 'resize', 'crop', 'rotate', 'flip', 'translate', 'scale', 'brightness', 'contrast_stretching',
+            'hist_equalization', 'adaptive_equalization','saturation', 'hue', 'gamma', 'gaussian_blur', 'motion_blur',
+            'zoom_blur','sharpening', 'gaussian_noise','salt_pepper_noise', 'random_erasing', 'elastic_distortion'
+        ]
+    ]

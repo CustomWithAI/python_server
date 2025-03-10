@@ -3,12 +3,13 @@ import numpy as np
 from typing import Optional, Tuple, List
 import random
 
+from app.models.augmentation import DataAugmentationConfig
 
 class Augmentation:
     def __init__(self):
         pass
 
-    def augmentation_classification(self, image: np.ndarray, config) -> np.ndarray:
+    def augmentation_classification(self, image: np.ndarray, config: DataAugmentationConfig) -> np.ndarray:
         '''
         Validate input image
         '''
@@ -19,76 +20,76 @@ class Augmentation:
         is_grayscale = (len(image.shape) == 2) or (
             len(image.shape) == 3 and image.shape[2] == 1)
 
-        for key, value in config.items():
+        for key in config.priority:
             # print(txt_file)
             # print(f"{key}: {value}")
 
             '''
             Geometric Transformations
             '''
-            if key == 'rotate':
-                if random.random() < value[0]:  # Probability
+            if key == 'rotate' and config.rotate:
+                if random.random() < config.rotate[0]:  # Probability
                     rows, cols = image.shape[:2]
-                    angle = random.uniform(-value[1], value[1])  # Angle range
+                    angle = random.uniform(-config.rotate[1], config.rotate[1])  # Angle range
                     matrix = cv2.getRotationMatrix2D(
                         (cols / 2, rows / 2), angle, 1)
                     image = cv2.warpAffine(image, matrix, (cols, rows))
 
-            if key == 'crop':
-                if random.random() < value[0]:  # Probability
-                    x, y, w, h = value[1]  # Crop parameters
+            if key == 'crop' and config.crop:
+                if random.random() < config.crop[0]:  # Probability
+                    x, y, w, h = config.crop[1]  # Crop parameters
                     image = image[y:y + h, x:x + w]
 
-            if key == 'flip':
-                if random.random() < value[0]:  # Probability
+            if key == 'flip' and config.flip:
+                if random.random() < config.flip[0]:  # Probability
                     # 0 = vertical, 1 = horizontal, -1 = both
-                    direction = value[1]
+                    direction = config.flip[1]
                     image = cv2.flip(image, direction)
 
-            if key == 'translate':
-                if random.random() < value[0]:  # Probability
+            if key == 'translate' and config.translate:
+                if random.random() < config.translate[0]:  # Probability
                     rows, cols = image.shape[:2]
-                    tx, ty = value[1]  # Shift range (x, y)
+                    tx, ty = config.translate[1]  # Shift range (x, y)
                     matrix = np.float32([[1, 0, tx], [0, 1, ty]])
                     image = cv2.warpAffine(image, matrix, (cols, rows))
 
-            if key == 'scale':
-                if random.random() < value[0]:  # Probability
-                    fx, fy = value[1]  # Scaling factors
+            if key == 'scale' and config.scale :
+                if random.random() < config.scale[0]:  # Probability
+                    fx, fy = config.scale[1]  # Scaling factors
                     image = cv2.resize(image, None, fx=fx,
                                        fy=fy, interpolation=cv2.INTER_LINEAR)
 
-            if key == 'grayscale':
-                if random.random() < value[0]:  # Probability
+            if key == 'grayscale' and config.grayscale:
+                if random.random() < config.grayscale[0]:  # Probability
                     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
             '''
             Color and Intensity Adjustments
             '''
-            if key == 'brightness':
-                if random.random() < value[0]:
-                    factor = random.uniform(-value[1], value[1])
+            if key == 'brightness' and config.brightness:
+                if random.random() < config.brightness[0]:
+                    factor = random.uniform(-config.brightness[1], config.brightness[1])
                     image = cv2.convertScaleAbs(
                         image, alpha=1, beta=factor * 255)
 
-            if key == 'contrast_stretching':
-                if random.random() < value[0]:
-                    lower, upper = value[1]
+            if key == 'contrast_stretching' and config.contrast_stretching:
+                if random.random() < config.contrast_stretching[0]:
+                    lower, upper = config.contrast_stretching[1]
                     in_range = (lower * 255, upper * 255)
                     image = cv2.normalize(
                         image, None, alpha=in_range[0], beta=in_range[1], norm_type=cv2.NORM_MINMAX)
 
-            if key == 'hist_equalization':
-                if random.random() < value[0]:
+            if key == 'hist_equalization' and config.hist_equalization:
+                if random.random() < config.hist_equalization[0]:
                     if len(image.shape) == 2:  # Grayscale image
                         image = cv2.equalizeHist(image)
                     else:
                         for i in range(3):  # Equalize each channel
                             image[:, :, i] = cv2.equalizeHist(image[:, :, i])
 
-            if key == 'adaptive_equalization':
-                if random.random() < value[0]:
-                    clip_limit = value[1]
+            if key == 'adaptive_equalization' and config.adaptive_equalization:
+                if random.random() < config.adaptive_equalization[0]:
+                    clip_limit = config.adaptive_equalization[1]
                     clahe = cv2.createCLAHE(
                         clipLimit=clip_limit, tileGridSize=(8, 8))
                     if len(image.shape) == 2:  # Grayscale
@@ -97,21 +98,21 @@ class Augmentation:
                         for i in range(3):
                             image[:, :, i] = clahe.apply(image[:, :, i])
 
-            if key == 'saturation':
-                if random.random() < value[0]:
+            if key == 'saturation' and config.saturation:
+                if random.random() < config.saturation[0]:
                     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-                    hsv[:, :, 1] = cv2.multiply(hsv[:, :, 1], value[1])
+                    hsv[:, :, 1] = cv2.multiply(hsv[:, :, 1], config.saturation[1])
                     image = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
-            if key == 'hue':
-                if random.random() < value[0]:
+            if key == 'hue' and config.hue:
+                if random.random() < config.hue[0]:
                     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-                    hsv[:, :, 0] = cv2.add(hsv[:, :, 0], value[1])
+                    hsv[:, :, 0] = cv2.add(hsv[:, :, 0], config.hue[1])
                     image = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
-            if key == 'gamma':
-                if random.random() < value[0]:
-                    gamma = value[1]
+            if key == 'gamma' and config.gamma:
+                if random.random() < config.gamma[0]:
+                    gamma = config.gamma[1]
                     inv_gamma = 1.0 / gamma
                     table = np.array(
                         [(i / 255.0) ** inv_gamma * 255 for i in range(256)]).astype("uint8")
@@ -120,15 +121,15 @@ class Augmentation:
             '''
             Blurring and Sharpening
             '''
-            if key == 'gaussian_blur':
-                if random.random() < value[0]:
-                    kernel_size, sigma = value[1]
+            if key == 'gaussian_blur' and config.gaussian_blur:
+                if random.random() < config.gaussian_blur[0]:
+                    kernel_size, sigma = config.gaussian_blur[1]
                     image = cv2.GaussianBlur(
                         image, (kernel_size, kernel_size), sigma)
 
-            if key == 'motion_blur':
-                if random.random() < value[0]:
-                    kernel_size, angle = value[1]
+            if key == 'motion_blur' and config.motion_blur:
+                if random.random() < config.motion_blur[0]:
+                    kernel_size, angle = config.motion_blur[1]
                     kernel = np.zeros((kernel_size, kernel_size))
                     kernel[int((kernel_size - 1) / 2),
                            :] = np.ones(kernel_size)
@@ -139,9 +140,9 @@ class Augmentation:
                     kernel = kernel / kernel.sum()
                     image = cv2.filter2D(image, -1, kernel)
 
-            if key == 'zoom_blur':
-                if random.random() < value[0]:
-                    zoom_factor = value[1]
+            if key == 'zoom_blur' and config.zoom_blur:
+                if random.random() < config.zoom_blur[0]:
+                    zoom_factor = config.zoom_blur[1]
                     center = tuple(np.array(image.shape[:2][::-1]) / 2)
                     original_size = image.shape[:2][::-1]
                     for i in range(1, zoom_factor):
@@ -166,9 +167,9 @@ class Augmentation:
 
                         image = cv2.addWeighted(image, 0.5, temp, 0.5, 0)
 
-            if key == 'sharpening':
-                if random.random() < value[0]:
-                    factor = value[1]
+            if key == 'sharpening' and config.sharpening:
+                if random.random() < config.sharpening[0]:
+                    factor = config.sharpening[1]
                     kernel = np.array(
                         [[0, -factor, 0], [-factor, 1 + 4 * factor, -factor], [0, -factor, 0]])
                     image = cv2.filter2D(image, -1, kernel)
@@ -176,15 +177,15 @@ class Augmentation:
             '''
             Noise Injection
             '''
-            if key == 'gaussian_noise':
-                if random.random() < value[0]:
-                    mean, var = value[1]
+            if key == 'gaussian_noise' and config.gaussian_noise:
+                if random.random() < config.gaussian_noise[0]:
+                    mean, var = config.gaussian_noise[1]
                     noise = np.random.normal(mean, var ** 0.5, image.shape)
                     image = cv2.add(image, noise.astype('uint8'))
 
-            if key == 'salt_pepper_noise':
-                if random.random() < value[0]:
-                    amount, s_vs_p = value[1]
+            if key == 'salt_pepper_noise' and config.salt_pepper_noise:
+                if random.random() < config.salt_pepper_noise[0]:
+                    amount, s_vs_p = config.salt_pepper_noise[1]
                     noisy = image.copy()
                     num_salt = np.ceil(amount * image.size * s_vs_p)
                     coords = [np.random.randint(
@@ -199,18 +200,18 @@ class Augmentation:
             '''
             Random Erasing
             '''
-            if key == 'random_erasing':
-                if random.random() < value[0]:
-                    x, y, w, h = value[1]
+            if key == 'random_erasing' and config.random_erasing:
+                if random.random() < config.random_erasing[0]:
+                    x, y, w, h = config.random_erasing[1]
                     image[y:y + h, x:x +
                           w] = np.random.randint(0, 256, (h, w, 3), dtype=np.uint8)
 
             '''
             Elastic Transformation
             '''
-            if key == 'elastic_distortion':
-                if random.random() < value[0]:
-                    alpha, sigma = value[1]
+            if key == 'elastic_distortion' and config.elastic_distortion:
+                if random.random() < config.elastic_distortion[0]:
+                    alpha, sigma = config.elastic_distortion[1]
                     shape = image.shape[:2]
 
                     # Generate random displacement fields
@@ -321,7 +322,12 @@ class Augmentation:
             adjusted_boxes.append((class_id, new_cx, new_cy, w, h))
         return adjusted_boxes
 
-    def augmentation_object_detection(self, image: np.ndarray, config, bounding_boxes) -> (np.ndarray, list):
+    def augmentation_object_detection(
+        self,
+        image: np.ndarray,
+        config: DataAugmentationConfig,
+        bounding_boxes: list
+    ) -> (np.ndarray, list):
         if image is None or image.size == 0:
             raise ValueError("Input image is empty or None.")
 
@@ -331,27 +337,27 @@ class Augmentation:
 
         rows, cols = image.shape[:2]
 
-        for key, value in config.items():
-            if key == 'rotate':
-                if random.random() < value[0]:
-                    angle = random.uniform(-value[1], value[1])
+        for key in config.priority:
+            if key == 'rotate' and config.rotate:
+                if random.random() < config.rotate[0]:
+                    angle = random.uniform(-config.rotate[1], config.rotate[1])
                     matrix = cv2.getRotationMatrix2D(
                         (cols / 2, rows / 2), angle, 1)
                     image = cv2.warpAffine(image, matrix, (cols, rows))
                     bounding_boxes = self.adjust_bounding_boxes_for_rotation(
                         bounding_boxes, angle)
 
-            if key == 'translate':
-                if random.random() < value[0]:
-                    tx, ty = value[1]
+            if key == 'translate' and config.translate:
+                if random.random() < config.translate[0]:
+                    tx, ty = config.translate[1]
                     matrix = np.float32([[1, 0, tx], [0, 1, ty]])
                     image = cv2.warpAffine(image, matrix, (cols, rows))
                     bounding_boxes = self.adjust_bounding_boxes_for_translation(
                         bounding_boxes, tx, ty, cols, rows)
 
-            if key == 'scale':
-                if random.random() < value[0]:
-                    fx, fy = value[1]
+            if key == 'scale' and config.scale:
+                if random.random() < config.scale[0]:
+                    fx, fy = config.scale[1]
                     # Debugging output
                     print(f"Scaling factors: fx={fx}, fy={fy}")
                     # Apply scaling
@@ -367,51 +373,51 @@ class Augmentation:
 
                     image = scaled_image
 
-            if key == 'flip':
-                if random.random() < value[0]:
-                    direction = value[1]
+            if key == 'flip' and config.flip:
+                if random.random() < config.flip[0]:
+                    direction = config.flip[1]
                     image = cv2.flip(image, direction)
                     bounding_boxes = self.adjust_bounding_boxes_for_flipping(
                         bounding_boxes, cols, rows, direction)
 
-            if key == 'crop':
-                if random.random() < value[0]:
-                    x, y, w, h = value[1]
+            if key == 'crop' and config.crop:
+                if random.random() < config.crop[0]:
+                    x, y, w, h = config.crop[1]
                     image = image[y:y + h, x:x + w]
                     bounding_boxes = self.adjust_bounding_boxes_for_cropping(
                         bounding_boxes, x, y, cols, rows, w, h)
 
-            if key == 'grayscale':
-                if random.random() < value[0]:  # Probability
+            if key == 'grayscale' and config.grayscale:
+                if random.random() < config.grayscale[0]:  # Probability
                     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
             '''
             Color and Intensity Adjustments
             '''
-            if key == 'brightness':
-                if random.random() < value[0]:
-                    factor = random.uniform(-value[1], value[1])
+            if key == 'brightness' and config.brightness:
+                if random.random() < config.brightness[0]:
+                    factor = random.uniform(-config.brightness[1], config.brightness[1])
                     image = cv2.convertScaleAbs(
                         image, alpha=1, beta=factor * 255)
 
-            if key == 'contrast_stretching':
-                if random.random() < value[0]:
-                    lower, upper = value[1]
+            if key == 'contrast_stretching' and config.contrast_stretching:
+                if random.random() < config.contrast_stretching[0]:
+                    lower, upper = config.contrast_stretching[1]
                     in_range = (lower * 255, upper * 255)
                     image = cv2.normalize(
                         image, None, alpha=in_range[0], beta=in_range[1], norm_type=cv2.NORM_MINMAX)
 
-            if key == 'hist_equalization':
-                if random.random() < value[0]:
+            if key == 'hist_equalization' and config.hist_equalization:
+                if random.random() < config.hist_equalization[0]:
                     if len(image.shape) == 2:  # Grayscale image
                         image = cv2.equalizeHist(image)
                     else:
                         for i in range(3):  # Equalize each channel
                             image[:, :, i] = cv2.equalizeHist(image[:, :, i])
 
-            if key == 'adaptive_equalization':
-                if random.random() < value[0]:
-                    clip_limit = value[1]
+            if key == 'adaptive_equalization' and config.adaptive_equalization:
+                if random.random() < config.adaptive_equalization[0]:
+                    clip_limit = config.adaptive_equalization[1]
                     clahe = cv2.createCLAHE(
                         clipLimit=clip_limit, tileGridSize=(8, 8))
                     if len(image.shape) == 2:  # Grayscale
@@ -420,21 +426,21 @@ class Augmentation:
                         for i in range(3):
                             image[:, :, i] = clahe.apply(image[:, :, i])
 
-            if key == 'saturation':
-                if random.random() < value[0]:
+            if key == 'saturation' and config.saturation:
+                if random.random() < config.saturation[0]:
                     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-                    hsv[:, :, 1] = cv2.multiply(hsv[:, :, 1], value[1])
+                    hsv[:, :, 1] = cv2.multiply(hsv[:, :, 1], config.saturation[1])
                     image = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
-            if key == 'hue':
-                if random.random() < value[0]:
+            if key == 'hue' and config.hue:
+                if random.random() < config.hue[0]:
                     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-                    hsv[:, :, 0] = cv2.add(hsv[:, :, 0], value[1])
+                    hsv[:, :, 0] = cv2.add(hsv[:, :, 0], config.hue[1])
                     image = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
-            if key == 'gamma':
-                if random.random() < value[0]:
-                    gamma = value[1]
+            if key == 'gamma' and config.gamma:
+                if random.random() < config.gamma[0]:
+                    gamma = config.gamma[1]
                     inv_gamma = 1.0 / gamma
                     table = np.array(
                         [(i / 255.0) ** inv_gamma * 255 for i in range(256)]).astype("uint8")
@@ -443,15 +449,15 @@ class Augmentation:
             '''
             Blurring and Sharpening
             '''
-            if key == 'gaussian_blur':
-                if random.random() < value[0]:
-                    kernel_size, sigma = value[1]
+            if key == 'gaussian_blur' and config.gaussian_blur:
+                if random.random() < config.gaussian_blur[0]:
+                    kernel_size, sigma = config.gaussian_blur[1]
                     image = cv2.GaussianBlur(
                         image, (kernel_size, kernel_size), sigma)
 
-            if key == 'motion_blur':
-                if random.random() < value[0]:
-                    kernel_size, angle = value[1]
+            if key == 'motion_blur' and config.motion_blur:
+                if random.random() < config.motion_blur[0]:
+                    kernel_size, angle = config.motion_blur[1]
                     kernel = np.zeros((kernel_size, kernel_size))
                     kernel[int((kernel_size - 1) / 2),
                            :] = np.ones(kernel_size)
@@ -462,9 +468,9 @@ class Augmentation:
                     kernel = kernel / kernel.sum()
                     image = cv2.filter2D(image, -1, kernel)
 
-            if key == 'zoom_blur':
-                if random.random() < value[0]:
-                    zoom_factor = value[1]
+            if key == 'zoom_blur' and config.zoom_blur:
+                if random.random() < config.zoom_blur[0]:
+                    zoom_factor = config.zoom_blur[1]
                     center = tuple(np.array(image.shape[:2][::-1]) / 2)
                     original_size = image.shape[:2][::-1]
                     for i in range(1, zoom_factor):
@@ -489,9 +495,9 @@ class Augmentation:
 
                         image = cv2.addWeighted(image, 0.5, temp, 0.5, 0)
 
-            if key == 'sharpening':
-                if random.random() < value[0]:
-                    factor = value[1]
+            if key == 'sharpening' and config.sharpening:
+                if random.random() < config.sharpening[0]:
+                    factor = config.sharpening[1]
                     kernel = np.array(
                         [[0, -factor, 0], [-factor, 1 + 4 * factor, -factor], [0, -factor, 0]])
                     image = cv2.filter2D(image, -1, kernel)
@@ -499,15 +505,15 @@ class Augmentation:
             '''
             Noise Injection
             '''
-            if key == 'gaussian_noise':
-                if random.random() < value[0]:
-                    mean, var = value[1]
+            if key == 'gaussian_noise' and config.gaussian_noise:
+                if random.random() < config.gaussian_noise[0]:
+                    mean, var = config.gaussian_noise[1]
                     noise = np.random.normal(mean, var ** 0.5, image.shape)
                     image = cv2.add(image, noise.astype('uint8'))
 
-            if key == 'salt_pepper_noise':
-                if random.random() < value[0]:
-                    amount, s_vs_p = value[1]
+            if key == 'salt_pepper_noise' and config.salt_pepper_noise:
+                if random.random() < config.salt_pepper_noise[0]:
+                    amount, s_vs_p = config.salt_pepper_noise[1]
                     noisy = image.copy()
                     num_salt = np.ceil(amount * image.size * s_vs_p)
                     coords = [np.random.randint(
@@ -522,18 +528,18 @@ class Augmentation:
             '''
             Random Erasing
             '''
-            if key == 'random_erasing':
-                if random.random() < value[0]:
-                    x, y, w, h = value[1]
+            if key == 'random_erasing' and config.random_erasing:
+                if random.random() < config.random_erasing[0]:
+                    x, y, w, h = config.random_erasing[1]
                     image[y:y + h, x:x +
                           w] = np.random.randint(0, 256, (h, w, 3), dtype=np.uint8)
 
             '''
             Elastic Transformation
             '''
-            if key == 'elastic_distortion':
-                if random.random() < value[0]:
-                    alpha, sigma = value[1]
+            if key == 'elastic_distortion' and config.elastic_distortion:
+                if random.random() < config.elastic_distortion[0]:
+                    alpha, sigma = config.elastic_distortion[1]
                     shape = image.shape[:2]
 
                     # Generate random displacement fields
