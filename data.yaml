@@ -1,5 +1,5 @@
 train: /app/yolo_dataset/train/images
 val: /app/yolo_dataset/valid/images
 test: /app/yolo_dataset/test/images
-nc: 2
-names: [stop, red]
+nc: 1
+names: [lanyard]

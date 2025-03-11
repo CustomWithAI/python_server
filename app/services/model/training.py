@@ -436,7 +436,6 @@ class DLTrainingPretrained():
         shutil.rmtree("./yolo_dataset/test", ignore_errors=True)
         shutil.rmtree("./yolo_dataset/valid", ignore_errors=True)
 
-# reload
     def train_cls(self, config: DeepLearningClassification):
         model = None
 
@@ -786,6 +785,8 @@ class ConstructTraining():
             validation_data=(
                 X_valid, {'bbox_output': y_bboxes_valid, 'class_output': y_classes_valid})
         )
+
+        model.save("model.h5")
 
     def get_image_paths(self, dataset_path):
         """Returns image file paths and corresponding annotation files."""

@@ -80,6 +80,7 @@ async def create_venv():
 async def training_yolo_pretrained(config: DeepLearningYoloRequest):
     dltrainingpretrain.train_yolo(config)
 
+
 @app.post("/dataset")
 async def create_dataset(images: List[UploadFile]):
     # TODO: Create dataset
@@ -130,7 +131,8 @@ async def prepare_dataset(config: DatasetConfig):
 async def use_all_model(img: UploadFile, config: str = Form(...)):
     convert_config = json.loads(config)
     model_type = convert_config["model"]
-    version = convert_config["version"]
+    if model_type == "dl_od_pt" or model_type == "dl_seg":
+        version = convert_config["version"]
     convert_img = await img.read()
 
     usemodel = UseModel()
@@ -144,7 +146,19 @@ async def use_all_model(img: UploadFile, config: str = Form(...)):
         return {"prediction": int(prediction)}
 
     if model_type == "dl_od":
-        prediction = usemodel.use_dl_od(convert_img, version)
+        prediction = usemodel.use_dl_od_pt(convert_img, version)
+        return {
+            "prediction": prediction
+        }
+
+    if model_type == "dl_od_con":
+        prediction = usemodel.use_dl_od_con(convert_img)
+        return {
+            "prediction": prediction
+        }
+
+    if model_type == "dl_seg":
+        prediction = usemodel.use_dl_seg(convert_img, version)
         return {
             "prediction": prediction
         }

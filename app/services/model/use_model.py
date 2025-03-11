@@ -5,6 +5,7 @@ import joblib
 import math
 from io import BytesIO
 from tensorflow.keras.models import load_model
+from keras.losses import MeanSquaredError, CategoricalCrossentropy
 import subprocess
 import tempfile
 from pathlib import Path
@@ -119,7 +120,7 @@ class UseModel:
 
         return predicted_class
 
-    def use_dl_od(self, img_bytes, version):
+    def use_dl_od_pt(self, img_bytes, version):
         # Save input image to a temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_img:
             temp_img.write(img_bytes)
@@ -185,5 +186,103 @@ class UseModel:
         shutil.rmtree(
             "./app/services/model/yolov5/runs/detect/exp", ignore_errors=True)
         shutil.rmtree("./runs/detect/predict2", ignore_errors=True)
+
+        return detections
+
+    def use_dl_od_con(self, img_bytes):
+        self.model = load_model("./model.h5", custom_objects={
+            'mse': MeanSquaredError(),
+            'categorical_crossentropy': CategoricalCrossentropy()
+        })
+
+        # Get model input shape dynamically
+        input_shape = self.model.input_shape[1:3]
+
+        # Preprocess image
+        processed_img = self.preprocess_image(img_bytes, input_shape)
+
+        # Predict
+        predictions = self.model.predict(processed_img)
+
+        bbox_pred = predictions[0]
+        class_pred = predictions[1]
+
+        detections = []
+        for i in range(len(bbox_pred)):  # Loop over each bounding box prediction
+            x_center, y_center, width, height = bbox_pred[i]
+            class_probabilities = class_pred[i]
+
+            # Determine the class_id by finding the index of the highest class probability
+            class_id = int(class_probabilities.argmax())
+
+            # Append the formatted prediction to the detections list
+            detections.append({
+                "class_id": class_id,  # The predicted class ID
+                "bbox": {
+                    "x_center": float(x_center),
+                    "y_center": float(y_center),
+                    "width": float(width),
+                    "height": float(height)
+                },
+                # Confidence of the predicted class
+                "confidence": float(class_probabilities[class_id])
+            })
+
+        return detections
+
+    def use_dl_seg(self, img_bytes, version):
+        # Save input image to a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_img:
+            temp_img.write(img_bytes)
+            temp_img_path = temp_img.name
+
+        weight_path = "./best.pt"
+
+        if version == "yolov8":
+            command = (
+                f"yolov8_venv/bin/yolo task=detect mode=predict model={weight_path} "
+                f"source={temp_img_path} conf=0.5 save_txt save"
+            )
+
+        if version == "yolov11":
+            command = (
+                f"yolov11_venv/bin/yolo task=detect mode=predict model={weight_path} "
+                f"source={temp_img_path} conf=0.5 save_txt save"
+            )
+
+        folder_path = "./runs/segment/predict/labels/"
+
+        subprocess.run(command, shell=True, check=True)
+
+        detections = []
+
+        # Get the list of all files in the folder
+        txt_files = [f for f in os.listdir(folder_path) if f.endswith(".txt")]
+
+        # Check if there are any .txt files
+        if txt_files:
+            # Pick the first .txt file
+            txt_file_path = os.path.join(folder_path, txt_files[0])
+
+            # Read the content of the first .txt file
+            with open(txt_file_path, "r") as file:
+                for line in file:
+                    # Split the line by spaces
+                    parts = line.strip().split()
+
+                    # Extract class_id and coordinates
+                    class_id = int(parts[0])
+                    coordinates = list(map(float, parts[1:]))
+
+                    # If coordinates have at least 6 values (min length for a polygon)
+                    if len(coordinates) >= 6:
+                        # Convert coordinates to a polygon or whatever structure you need
+                        # Example: for segmentation, we can return a polygon (list of tuples)
+                        polygon = [(coordinates[i], coordinates[i+1])
+                                   for i in range(0, len(coordinates), 2)]
+                        detections.append(
+                            {"class_id": class_id, "polygon": polygon})
+
+        shutil.rmtree("./runs/segment/predict", ignore_errors=True)
 
         return detections
