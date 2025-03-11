@@ -4,7 +4,6 @@ import os
 import glob
 import subprocess
 
-from typing import List
 from app.services.dataset.dataset import preprocess_all_dataset, augment_dataset_class, augment_dataset_obj, augment_dataset_seg
 from app.services.model.training import MLTraining, DLTrainingPretrained, ConstructTraining
 from app.models.ml import MachineLearningClassificationRequest
@@ -15,7 +14,7 @@ from app.models.dl import (
     DeepLearningObjectDetectionConstructFeatex,
     DeepLearningObjectDetectionConstructRequest,
 )
-from app.models.dataset import DatasetConfig
+from app.models.dataset import DatasetConfigRequest, PrepareDatasetRequest
 from app.services.model.use_model import UseModel
 
 mltraining = MLTraining()
@@ -82,7 +81,7 @@ async def training_yolo_pretrained(config: DeepLearningYoloRequest):
 
 
 @app.post("/dataset")
-async def create_dataset(images: List[UploadFile]):
+async def create_dataset(data: PrepareDatasetRequest):
     # TODO: Create dataset
     return {
         "message": "Dataset created successfully"
@@ -90,7 +89,7 @@ async def create_dataset(images: List[UploadFile]):
 
 
 @app.post("/dataset-config")
-async def prepare_dataset(config: DatasetConfig):
+async def prepare_dataset(config: DatasetConfigRequest):
     # TODO: Get dataset
 
     # TODO: Preprocess images

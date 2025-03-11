@@ -48,7 +48,7 @@ feature_extractor = FeatureExtraction()
 
 
 class MLTraining():
-    def load_dataset(self, base_path):
+    def load_dataset(self, base_path: str):
         images = []
         labels = []
         class_names = os.listdir(base_path)
