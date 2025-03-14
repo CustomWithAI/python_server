@@ -6,10 +6,11 @@ from app.models.augmentation import DataAugmentationConfig
 
 class DatasetImage(BaseModel):
     url: str
-    image_class: str
-    annotation: Dict[str, Any]
+    class_name: str
+    annotation: Optional[Dict[str, Any]] = None
 
 class PrepareDatasetRequest(BaseModel):
+    type: Literal['classification', 'object_detection', 'segmentation']
     train_data: List[DatasetImage]
     test_data: List[DatasetImage]
     valid_data: List[DatasetImage]

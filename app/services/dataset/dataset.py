@@ -1,15 +1,19 @@
 import os
 import cv2
+import requests
 import random
 import shutil
+
+from typing import List, Dict
 from collections import defaultdict
 from app.services.dataset.preprocessing import Preprocessing
 from app.services.dataset.augmentation import Augmentation
 from app.models.preprocessing import ImagePreprocessingConfig
 from app.models.augmentation import DataAugmentationConfig
+from app.models.dataset import PrepareDatasetRequest
+
 preprocess = Preprocessing()
 augmentation = Augmentation()
-
 
 def preprocess_all_dataset(dataset_dir: str, config_preprocess: ImagePreprocessingConfig):
     for root, dirs, files in os.walk(dataset_dir):
@@ -89,7 +93,7 @@ def augment_dataset_obj(folder_path: str, config_augmentation: DataAugmentationC
         class_to_images[class_label].append((image_file, txt_file))
 
     total_current_images = len(image_files)
-    num_augmentations_needed = target_num_images - total_current_images
+    num_augmentations_needed = config_augmentation.number - total_current_images
     if num_augmentations_needed <= 0:
         print("Target number of images already met or exceeded.")
         return
@@ -166,7 +170,7 @@ def augment_dataset_seg(folder_path: str, config_augmentation: DataAugmentationC
         class_to_images[class_label].append((image_file, txt_file))
 
     total_current_images = len(image_files)
-    num_augmentations_needed = target_num_images - total_current_images
+    num_augmentations_needed = config_augmentation.number - total_current_images
     if num_augmentations_needed <= 0:
         print("Target number of images already met or exceeded.")
         return
@@ -213,3 +217,72 @@ def augment_dataset_seg(folder_path: str, config_augmentation: DataAugmentationC
                 folder_path, f"aug_{unique_suffix}_{txt_file}")
             with open(adjusted_txt_path, 'w') as file:
                 file.write(content)  # Corrected to use 'file.write'
+
+def setup_directories():
+    base_dir = "dataset"
+    if os.path.exists(base_dir):
+        shutil.rmtree(base_dir)
+    for folder in ["train", "test", "valid"]:
+        os.makedirs(os.path.join(base_dir, folder), exist_ok=True)
+
+def download_image(url: str, save_path: str):
+    response = requests.get(url, stream=True)
+    if response.status_code == 200:
+        with open(save_path, 'wb') as file:
+            for chunk in response.iter_content(1024):
+                file.write(chunk)
+    else:
+        print(f"❌ Failed to download: {url}")
+
+def create_label_txt(base_dir: str, class_map: Dict[str, int]):
+    label_path = os.path.join(base_dir, "label.txt")
+    with open(label_path, "w") as f:
+        for class_name in class_map.keys():
+            f.write(f"{class_name}\n")  # เขียนชื่อ class ลงไป
+
+def save_annotation(file_path: str, class_idx: int, annotation: List[float]):
+    with open(file_path, "w") as f:
+        f.write(f"{class_idx} " + " ".join(map(str, annotation)) + "\n")
+
+def prepare_dataset(request: PrepareDatasetRequest):
+    setup_directories()
+
+    datasets = {
+        "train": request.train_data,
+        "test": request.test_data,
+        "valid": request.valid_data
+    }
+
+    # 🏷 สร้าง mapping class_name -> index
+    class_names = sorted(set(img.class_name for data in datasets.values() for img in data))
+    class_map = {name: idx for idx, name in enumerate(class_names)}
+
+    # ถ้าเป็น object_detection หรือ segmentation ให้สร้าง label.txt
+    if request.type in ["object_detection", "segmentation"]:
+        for split in ["train", "test", "valid"]:
+            create_label_txt(os.path.join("dataset", split), class_map)
+
+    # 🚀 จัดการไฟล์ตามประเภทที่เลือก
+    for split, images in datasets.items():
+        split_dir = os.path.join("dataset", split)
+
+        for img in images:
+            image_filename = os.path.basename(img.url)
+            image_path = os.path.join(split_dir, image_filename)
+
+            # 📌 ถ้าเป็น classification → แยกโฟลเดอร์ตาม class_name
+            if request.type == "classification":
+                class_folder = os.path.join(split_dir, img.class_name)
+                os.makedirs(class_folder, exist_ok=True)
+                image_path = os.path.join(class_folder, image_filename)
+
+            # 🖼️ ดาวน์โหลดรูปภาพ
+            download_image(img.url, image_path)
+
+            # 📝 ถ้าเป็น object_detection หรือ segmentation → สร้างไฟล์ annotation
+            if request.type in ["object_detection", "segmentation"] and img.annotation:
+                annotation_filename = image_filename.replace(".png", ".txt").replace(".jpg", ".txt")
+                annotation_path = os.path.join(split_dir, annotation_filename)
+                save_annotation(annotation_path, class_map[img.class_name], img.annotation)
+
+    print("✅ Dataset preparation completed!")
