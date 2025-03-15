@@ -12,16 +12,16 @@ class MlModel:
     def create_ml_model(self, config: MachineLearningModel):
         model = None
 
-        if config.decision_trees:
-            model = DecisionTreeClassifier(**config.decision_trees.model_dump())
+        if config.type == "decision_trees":
+            model = DecisionTreeClassifier(**config.model.model_dump())
 
-        elif config.random_forest:
-            model = RandomForestClassifier(**config.random_forest.model_dump())
+        elif config.type == "random_forest":
+            model = RandomForestClassifier(**config.model.model_dump())
 
-        elif config.svm:
-            model = SVC(**config.svm.model_dump())
+        elif config.type == "svm":
+            model = SVC(**config.model.model_dump())
 
-        elif config.knn:
-            model = KNeighborsClassifier(**config.knn.model_dump())
+        elif config.type == "knn":
+            model = KNeighborsClassifier(**config.model.model_dump())
 
         return model

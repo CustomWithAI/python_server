@@ -1,5 +1,5 @@
-from pydantic import BaseModel, model_validator
-from typing import Optional, Literal
+from pydantic import BaseModel
+from typing import Optional, Literal, Union
 
 from app.models.feature_extraction import FeatureExtractionConfig
 
@@ -32,24 +32,28 @@ class KNN(BaseModel):
     algorithm: Literal['auto', 'ball_tree', 'kd_tree', 'brute'] = 'auto'
     leaf_size: int = 30
 
+class DecisionTreesRequest(BaseModel):
+    type: Literal['decision_trees']
+    model: DecisionTrees
 
-class MachineLearningModel(BaseModel):
-    decision_trees: Optional[DecisionTrees] = None
-    random_forest: Optional[RandomForest] = None
-    svm: Optional[SVM] = None
-    knn: Optional[KNN] = None
+class RandomForestRequest(BaseModel):
+    type: Literal['random_forest']
+    model: RandomForest
 
-    @model_validator(mode="after")
-    def validate_model(cls, values: "MachineLearningModel"):
-        if (
-            values.decision_trees is None and
-            values.random_forest is None and
-            values.svm is None and
-            values.knn is None
-        ):
-            raise ValueError("At least one model must be provided")
-        return values
+class SVMRequest(BaseModel):
+    type: Literal['svm']
+    model: SVM
 
+class KNNRequest(BaseModel):
+    type: Literal['knn']
+    model: KNN
+
+MachineLearningModel = Union[
+    DecisionTreesRequest,
+    RandomForestRequest,
+    SVMRequest,
+    KNNRequest,
+]
 
 class MachineLearningClassificationRequest(BaseModel):
     model: MachineLearningModel
