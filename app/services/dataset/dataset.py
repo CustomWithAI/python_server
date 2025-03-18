@@ -4,13 +4,15 @@ import requests
 import random
 import shutil
 
+from PIL import Image
+from io import BytesIO
 from typing import List, Dict
 from collections import defaultdict
 from app.services.dataset.preprocessing import Preprocessing
 from app.services.dataset.augmentation import Augmentation
 from app.models.preprocessing import ImagePreprocessingConfig
 from app.models.augmentation import DataAugmentationConfig
-from app.models.dataset import PrepareDatasetRequest
+from app.models.dataset import PrepareDatasetRequest, ObjectDetectionPlot, SegmentationPlot
 
 preprocess = Preprocessing()
 augmentation = Augmentation()
@@ -218,71 +220,85 @@ def augment_dataset_seg(folder_path: str, config_augmentation: DataAugmentationC
             with open(adjusted_txt_path, 'w') as file:
                 file.write(content)  # Corrected to use 'file.write'
 
-def setup_directories():
+def normalize(value: int, max_value: int) -> float:
+    return value / max_value
+
+def convert_object_detection(annotation: List[ObjectDetectionPlot], labels: List[str], img_width: int, img_height: int) -> str:
+    result = []
+    for obj in annotation:
+        class_idx = labels.index(obj.label)
+        x_center = normalize(obj.x + obj.width / 2, img_width)
+        y_center = normalize(obj.y + obj.height / 2, img_height)
+        width_norm = normalize(obj.width, img_width)
+        height_norm = normalize(obj.height, img_height)
+        result.append(f"{class_idx} {x_center} {y_center} {width_norm} {height_norm}")
+    return "\n".join(result)
+
+def convert_segmentation(annotation: List[SegmentationPlot], labels: List[str], img_width: int, img_height: int) -> str:
+    result = []
+    for obj in annotation:
+        class_idx = labels.index(obj.label)
+        points = [(normalize(p.x, img_width), normalize(p.y, img_height)) for p in obj.points]
+        points.append(points[0])  # ปิด polygon
+        point_str = " ".join(f"{x} {y}" for x, y in points)
+        result.append(f"{class_idx} {point_str}")
+    return "\n".join(result)
+
+def prepare_dataset(request: PrepareDatasetRequest):
     base_dir = "dataset"
     if os.path.exists(base_dir):
         shutil.rmtree(base_dir)
-    for folder in ["train", "test", "valid"]:
-        os.makedirs(os.path.join(base_dir, folder), exist_ok=True)
-
-def download_image(url: str, save_path: str):
-    response = requests.get(url, stream=True)
-    if response.status_code == 200:
-        with open(save_path, 'wb') as file:
-            for chunk in response.iter_content(1024):
-                file.write(chunk)
-    else:
-        print(f"❌ Failed to download: {url}")
-
-def create_label_txt(base_dir: str, class_map: Dict[str, int]):
-    label_path = os.path.join(base_dir, "label.txt")
-    with open(label_path, "w") as f:
-        for class_name in class_map.keys():
-            f.write(f"{class_name}\n")  # เขียนชื่อ class ลงไป
-
-def save_annotation(file_path: str, class_idx: int, annotation: List[float]):
-    with open(file_path, "w") as f:
-        f.write(f"{class_idx} " + " ".join(map(str, annotation)) + "\n")
-
-def prepare_dataset(request: PrepareDatasetRequest):
-    setup_directories()
+    os.makedirs(os.path.join(base_dir, "train"), exist_ok=True)
+    os.makedirs(os.path.join(base_dir, "test"), exist_ok=True)
+    os.makedirs(os.path.join(base_dir, "valid"), exist_ok=True)
 
     datasets = {
         "train": request.train_data,
         "test": request.test_data,
         "valid": request.valid_data
     }
+    
+    sorted_labels = sorted(request.labels)
 
-    # 🏷 สร้าง mapping class_name -> index
-    class_names = sorted(set(img.class_name for data in datasets.values() for img in data))
-    class_map = {name: idx for idx, name in enumerate(class_names)}
-
-    # ถ้าเป็น object_detection หรือ segmentation ให้สร้าง label.txt
     if request.type in ["object_detection", "segmentation"]:
-        for split in ["train", "test", "valid"]:
-            create_label_txt(os.path.join("dataset", split), class_map)
+        label_content = "\n".join(sorted_labels)
+        for split in datasets.keys():
+            label_path = os.path.join(base_dir, split, "label.txt")
+            with open(label_path, "w") as f:
+                f.write(label_content)
 
-    # 🚀 จัดการไฟล์ตามประเภทที่เลือก
     for split, images in datasets.items():
-        split_dir = os.path.join("dataset", split)
+        split_dir = os.path.join(base_dir, split)
 
         for img in images:
             image_filename = os.path.basename(img.url)
-            image_path = os.path.join(split_dir, image_filename)
 
-            # 📌 ถ้าเป็น classification → แยกโฟลเดอร์ตาม class_name
-            if request.type == "classification":
-                class_folder = os.path.join(split_dir, img.class_name)
-                os.makedirs(class_folder, exist_ok=True)
-                image_path = os.path.join(class_folder, image_filename)
+            response = requests.get(img.url, stream=True)
+            if response.status_code == 200:
+                image = Image.open(BytesIO(response.content))
+                img_width, img_height = image.size
+                
+                if request.type == "classification":
+                    class_folder = os.path.join(split_dir, img.annotation.label)
+                    os.makedirs(class_folder, exist_ok=True)
+                    image_path = os.path.join(class_folder, image_filename)
+                else:
+                    image_path = os.path.join(split_dir, image_filename)
 
-            # 🖼️ ดาวน์โหลดรูปภาพ
-            download_image(img.url, image_path)
+                with open(image_path, 'wb') as file:
+                    file.write(response.content)
 
-            # 📝 ถ้าเป็น object_detection หรือ segmentation → สร้างไฟล์ annotation
-            if request.type in ["object_detection", "segmentation"] and img.annotation:
-                annotation_filename = image_filename.replace(".png", ".txt").replace(".jpg", ".txt")
-                annotation_path = os.path.join(split_dir, annotation_filename)
-                save_annotation(annotation_path, class_map[img.class_name], img.annotation)
+                if request.type == "object_detection":
+                    annotation_text = convert_object_detection(
+                        img.annotation.annotation, sorted_labels, img_width, img_height
+                    )
+                elif request.type == "segmentation":
+                    annotation_text = convert_segmentation(
+                        img.annotation.annotation, sorted_labels, img_width, img_height
+                    )
+                else:
+                    continue
 
-    print("✅ Dataset preparation completed!")
+                annotation_path = os.path.join(split_dir, image_filename.replace(".png", ".txt").replace(".jpg", ".txt"))
+                with open(annotation_path, "w") as f:
+                    f.write(annotation_text)
