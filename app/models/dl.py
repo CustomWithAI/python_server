@@ -18,7 +18,7 @@ ObjectDetectionWeightSizes = Literal[
 
 SegmentationWeightSizes = Literal[
     "yolov8s-seg.pt", "yolov8m-seg.pt", "yolov8l-seg.pt",
-    "yolov11s-seg.pt", "yolov11m-seg.pt", "yolov11l-seg.pt"
+    "yolo11s-seg.pt", "yolo11m-seg.pt", "yolo11l-seg.pt"
 ]
 
 

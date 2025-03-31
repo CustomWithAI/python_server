@@ -431,10 +431,9 @@ class DLTrainingPretrained():
             subprocess.run(command, shell=True, check=True)
 
             # shutil.rmtree("./runs/", ignore_errors=True)
-
-        shutil.rmtree("./yolo_dataset/train", ignore_errors=True)
-        shutil.rmtree("./yolo_dataset/test", ignore_errors=True)
-        shutil.rmtree("./yolo_dataset/valid", ignore_errors=True)
+        
+        for path in ["train", "test", "valid"]:
+            shutil.rmtree(f"./yolo_dataset/{path}", ignore_errors=True)
 
     def train_cls(self, config: DeepLearningClassification):
         model = None
@@ -478,6 +477,9 @@ class DLTrainingPretrained():
         # Train the model
         history = model.fit(X_train, y_train, validation_data=(
             X_val, y_val), epochs=config_training.epochs, batch_size=config_training.batch_size, callbacks=callbacks)
+        
+        # Save the model
+        model.save("model.h5")
 
         return history
 

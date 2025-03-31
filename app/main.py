@@ -16,10 +16,11 @@ from app.models.dl import (
 )
 from app.models.dataset import DatasetConfigRequest, PrepareDatasetRequest
 from app.services.model.use_model import UseModel
+from app.helpers.models import delete_all_models, get_model
 
-mltraining = MLTraining()
-dltrainingpretrain = DLTrainingPretrained()
-constructtraining = ConstructTraining()
+ml_training = MLTraining()
+dl_training_pretrained = DLTrainingPretrained()
+construct_training = ConstructTraining()
 
 app = FastAPI()
 
@@ -31,28 +32,31 @@ async def status():
 
 @app.post("/training-ml")
 async def training_ml(config: MachineLearningClassificationRequest):
-    mltraining.training_ml_cls(config)
+    ml_training.training_ml_cls(config)
+    return get_model("cls", "ml")
 
 
 @app.post("/training-dl-cls-pt")
 async def training_dl(config: DeepLearningClassification):
-    dltrainingpretrain.train_cls(config)
+    dl_training_pretrained.train_cls(config)
+    return get_model("cls", "pt")
 
 
 @app.post("/training-dl-cls-construct")
 async def construct_model(config: DeepLearningClassificationConstruct):
     if config.featex:
-        constructtraining.train_cls_featex(config)
+        construct_training.train_cls_featex(config)
     else:
-        constructtraining.train_cls(config)
-
+        construct_training.train_cls(config)
+    return get_model("cls", "construct")
 
 @app.post("/training-dl-od-construct")
 async def construct_model(config: DeepLearningObjectDetectionConstructRequest):
     if isinstance(config, DeepLearningObjectDetectionConstructFeatex):
-        constructtraining.train_od_featex(config)
+        construct_training.train_od_featex(config)
     else:
-        constructtraining.train_od(config)
+        construct_training.train_od(config)
+    return get_model("od", "construct")
 
 
 @app.post("/create_yolo_venv")
@@ -77,11 +81,18 @@ async def create_venv():
 
 @app.post("/training-yolo-pt")
 async def training_yolo_pretrained(config: DeepLearningYoloRequest):
-    dltrainingpretrain.train_yolo(config)
+    dl_training_pretrained.train_yolo(config)
+    if config.type == "object_detection":
+        return get_model("od", "pt", config.model)
+    elif config.type == "segmentation":
+        return get_model("seg", "pt", config.model)
+    else:
+        raise ValueError("Invalid type for deep learning workflow")
 
 
 @app.post("/dataset")
 async def create_dataset(data: PrepareDatasetRequest):
+    delete_all_models()
     prepare_dataset(data)
 
 
