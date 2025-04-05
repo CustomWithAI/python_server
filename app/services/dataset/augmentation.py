@@ -37,7 +37,8 @@ class Augmentation:
 
             if key == 'crop' and config.crop:
                 if random.random() < config.crop[0]:  # Probability
-                    x, y, w, h = config.crop[1]  # Crop parameters
+                    w, h = config.crop[1]  # Crop parameters
+                    x, y = config.crop[2]  # Crop parameters
                     image = image[y:y + h, x:x + w]
 
             if key == 'flip' and config.flip:
@@ -60,7 +61,7 @@ class Augmentation:
                                        fy=fy, interpolation=cv2.INTER_LINEAR)
 
             if key == 'grayscale' and config.grayscale:
-                if random.random() < config.grayscale[0]:  # Probability
+                if random.random() < config.grayscale:  # Probability
                     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
             '''
@@ -79,8 +80,8 @@ class Augmentation:
                     image = cv2.normalize(
                         image, None, alpha=in_range[0], beta=in_range[1], norm_type=cv2.NORM_MINMAX)
 
-            if key == 'hist_equalization' and config.hist_equalization:
-                if random.random() < config.hist_equalization[0]:
+            if key == 'histogram_equalization' and config.histogram_equalization:
+                if random.random() < config.histogram_equalization[0]:
                     if len(image.shape) == 2:  # Grayscale image
                         image = cv2.equalizeHist(image)
                     else:
@@ -382,13 +383,14 @@ class Augmentation:
 
             if key == 'crop' and config.crop:
                 if random.random() < config.crop[0]:
-                    x, y, w, h = config.crop[1]
+                    w, h = config.crop[1]
+                    x, y = config.crop[2]
                     image = image[y:y + h, x:x + w]
                     bounding_boxes = self.adjust_bounding_boxes_for_cropping(
                         bounding_boxes, x, y, cols, rows, w, h)
 
             if key == 'grayscale' and config.grayscale:
-                if random.random() < config.grayscale[0]:  # Probability
+                if random.random() < config.grayscale:  # Probability
                     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
             '''
@@ -407,8 +409,8 @@ class Augmentation:
                     image = cv2.normalize(
                         image, None, alpha=in_range[0], beta=in_range[1], norm_type=cv2.NORM_MINMAX)
 
-            if key == 'hist_equalization' and config.hist_equalization:
-                if random.random() < config.hist_equalization[0]:
+            if key == 'histogram_equalization' and config.histogram_equalization:
+                if random.random() < config.histogram_equalization[0]:
                     if len(image.shape) == 2:  # Grayscale image
                         image = cv2.equalizeHist(image)
                     else:

@@ -5,6 +5,7 @@ import random
 import shutil
 
 from PIL import Image
+from urllib.parse import urlparse
 from io import BytesIO
 from typing import List, Dict
 from collections import defaultdict
@@ -271,13 +272,14 @@ def prepare_dataset(request: PrepareDatasetRequest):
         split_dir = os.path.join(base_dir, split)
 
         for img in images:
-            image_filename = os.path.basename(img.url)
+            parsed_url = urlparse(img.url)
+            image_filename = os.path.basename(parsed_url.path)
 
             response = requests.get(img.url, stream=True)
             if response.status_code == 200:
                 image = Image.open(BytesIO(response.content))
                 img_width, img_height = image.size
-                
+
                 if request.type == "classification":
                     class_folder = os.path.join(split_dir, img.annotation.label)
                     os.makedirs(class_folder, exist_ok=True)
@@ -299,6 +301,6 @@ def prepare_dataset(request: PrepareDatasetRequest):
                 else:
                     continue
 
-                annotation_path = os.path.join(split_dir, image_filename.replace(".png", ".txt").replace(".jpg", ".txt"))
+                annotation_path = image_path.replace(".png", ".txt").replace(".jpg", ".txt")
                 with open(annotation_path, "w") as f:
                     f.write(annotation_text)

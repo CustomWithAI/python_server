@@ -54,10 +54,10 @@ class FeatureExtraction:
         return features
 
     @staticmethod
-    def extract_orb_features(image, n_keypoints=500, scale_factor=1.2, n_levels=8, count_feat=False, max_features=600):
+    def extract_orb_features(image, n_keypoints=500, scale_factor=1.2, n_level=8, count_feat=False, max_features=600):
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         orb = cv2.ORB_create(nfeatures=n_keypoints,
-                             scaleFactor=scale_factor, nlevels=n_levels)
+                             scaleFactor=scale_factor, nlevels=n_level)
 
         keypoints, descriptors = orb.detectAndCompute(gray, None)
 
