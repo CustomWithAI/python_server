@@ -385,7 +385,16 @@ class Augmentation:
                 if random.random() < config.crop[0]:
                     w, h = config.crop[1]
                     x, y = config.crop[2]
-                    image = image[y:y + h, x:x + w]
+
+                    # Get actual image size
+                    img_h, img_w = image.shape[:2]
+
+                    # Ensure crop stays within image bounds
+                    if x + w <= img_w and y + h <= img_h:
+                        image = image[y:y + h, x:x + w]
+                    else:
+                        print(f"[WARNING] Crop area ({x},{y},{w},{h}) out of bounds for image size ({img_w},{img_h}). Skipping crop.")
+
                     bounding_boxes = self.adjust_bounding_boxes_for_cropping(
                         bounding_boxes, x, y, cols, rows, w, h)
 
