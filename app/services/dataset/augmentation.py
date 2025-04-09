@@ -39,7 +39,15 @@ class Augmentation:
                 if random.random() < config.crop[0]:  # Probability
                     w, h = config.crop[1]  # Crop parameters
                     x, y = config.crop[2]  # Crop parameters
-                    image = image[y:y + h, x:x + w]
+                    
+                    # Get actual image size
+                    img_h, img_w = image.shape[:2]
+
+                    # Ensure crop stays within image bounds
+                    if x + w <= img_w and y + h <= img_h:
+                        image = image[y:y + h, x:x + w]
+                    else:
+                        print(f"[WARNING] Crop area ({x},{y},{w},{h}) out of bounds for image size ({img_w},{img_h}). Skipping crop.")
 
             if key == 'flip' and config.flip:
                 if random.random() < config.flip[0]:  # Probability

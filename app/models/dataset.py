@@ -5,14 +5,14 @@ from app.models.preprocessing import ImagePreprocessingConfig
 from app.models.augmentation import DataAugmentationConfig
 
 class Point(BaseModel):
-    x: int
-    y: int
+    x: float
+    y: float
 
 class ObjectDetectionPlot(BaseModel):
-    x: int
-    y: int
-    width: int
-    height: int
+    x: float
+    y: float
+    width: float
+    height: float
     label: str
 
 class SegmentationPlot(BaseModel):
