@@ -381,7 +381,7 @@ class DLTrainingPretrained():
             for file in os.listdir(split_source_dir):
                 source_file = os.path.join(split_source_dir, file)
 
-                if file.endswith(".jpg"):
+                if file.endswith((".jpg", ".png")):
                     target_subdir = subdirs["image"]
                 elif file.endswith(".txt") and not file.startswith("label"):
                     target_subdir = subdirs["labels"]
