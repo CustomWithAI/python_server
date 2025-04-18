@@ -12,10 +12,20 @@ class ConstructDLOD(object):
     def __init__(self):
         pass
 
-    def construct(self, config: DeepLearningObjectDetectionConstructModel, input_shape, num_classes, num_boxes=1):
+
+class ConstructDLOD(object):
+    def __init__(self):
+        pass
+
+
+class ConstructDLOD(object):
+    def __init__(self):
+        pass
+
+    def construct(self, config: DeepLearningObjectDetectionConstructModel, input_shape, num_classes, max_boxes=20):
         print("Received input_shape:", input_shape)
-        # Ensure input shape is correct
-        inputs = layers.Input(shape=input_shape)
+        # Ensure input shape is correct for Conv2D input
+        inputs = layers.Input(shape=input_shape, name="input_layer")
         x = inputs
 
         for layer_config in config:
@@ -55,14 +65,20 @@ class ConstructDLOD(object):
             elif isinstance(layer_config, DropoutLayer):
                 x = layers.Dropout(layer_config.dropoutLayer_rate)(x)
 
-        # Object Detection Output Heads
-        bbox_output = layers.Dense(
-            num_boxes * 4, activation="linear", name="bbox_output")(x)
-        class_output = layers.Dense(
-            num_classes, activation="softmax", name="class_output")(x)
+        # Object Detection Output Heads (updated for multiple boxes)
+        # Create a dense layer first (without activation)
+        bbox_dense = layers.Dense(
+            max_boxes * 4, name="bbox_output")(x)
+        # Reshape it to the correct dimensions
+        bbox_output = layers.Reshape((max_boxes, 4), name="bbox_reshape")(bbox_dense)
+        
+        # Same for class output
+        class_dense = layers.Dense(
+            max_boxes * num_classes, name="class_output")(x)
+        class_reshape = layers.Reshape((max_boxes, num_classes), name="class_reshape")(class_dense)
+        class_output = layers.Activation("softmax", name="class_activation")(class_reshape)
 
-        model = models.Model(inputs=inputs, outputs=[
-                             bbox_output, class_output])
+        model = models.Model(inputs=inputs, outputs=[bbox_output, class_output])
 
         return model
 

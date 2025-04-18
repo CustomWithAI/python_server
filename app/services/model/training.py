@@ -706,29 +706,56 @@ class ConstructTraining():
             bboxes.append([x_center, y_center, width, height])
             class_ids.append(class_id)
 
+        # Handle case with no annotations
+        if len(bboxes) == 0:
+            return img, np.array([]), np.array([])
+            
         return img, np.array(bboxes), np.array(class_ids)
 
-    def load_dataset(self, dataset_dir, input_size):
+    def load_dataset(self, dataset_dir, input_size, num_classes, max_boxes=20):
+        """
+        Load images and annotations from the dataset directory
+        max_boxes: Maximum number of bounding boxes to support per image
+        """
         images = []
-        bboxes = []
-        class_ids = []
+        all_bboxes = []
+        all_classes = []
 
         for img_file in os.listdir(dataset_dir):
-            if img_file.endswith('.jpg'):
+            if img_file.endswith(('.jpg', '.jpeg', '.png')):
                 img_path = os.path.join(dataset_dir, img_file)
                 ann_path = os.path.splitext(img_path)[0] + '.txt'
+                
+                if not os.path.exists(ann_path):
+                    continue
 
                 # Load the image and annotations
-                img, bbox, class_id = self.load_image_and_annotations(
+                img, bboxes, class_ids = self.load_image_and_annotations(
                     img_path, ann_path, input_size)
-
+                
+                if len(bboxes) == 0:
+                    continue
+                    
+                # Pad bboxes and class_ids to max_boxes
+                padded_bboxes = np.zeros((max_boxes, 4))
+                padded_classes = np.zeros((max_boxes, num_classes))
+                
+                # Fill in the actual data
+                num_boxes = min(len(bboxes), max_boxes)
+                padded_bboxes[:num_boxes] = bboxes[:num_boxes]
+                
+                # Convert class_ids to one-hot encoding
+                for i in range(num_boxes):
+                    padded_classes[i, class_ids[i]] = 1.0
+                    
                 images.append(img)
-                bboxes.append(bbox)
-                class_ids.append(class_id)
+                all_bboxes.append(padded_bboxes)
+                all_classes.append(padded_classes)
 
-        class_ids = to_categorical(np.array(class_ids), num_classes=2)
-
-        return np.array(images), np.array(bboxes), class_ids
+        if not images:
+            raise ValueError("No valid images found in the dataset directory")
+            
+        return np.array(images), np.array(all_bboxes), np.array(all_classes)
 
     def train_od(self, config: DeepLearningObjectDetectionConstruct):
         # Unpack training configuration
@@ -750,45 +777,85 @@ class ConstructTraining():
         image_path = os.path.join(folder_path, image_files[0])
         img = cv2.imread(image_path)
         img_shape = img.shape
-        input_shape = img_shape[:2]
+        input_shape = img_shape
+        
+        # Determine the number of classes
+        # Option 1: Read from the labels file (assuming it contains all class names)
+        try:
+            with open('./dataset/classes.txt', 'r') as file:
+                classes = [line.strip() for line in file]
+            num_classes = len(classes)
+        except FileNotFoundError:
+            # Option 2: Determine from annotations by finding the max class ID + 1
+            max_class_id = -1
+            for img_file in os.listdir(folder_path):
+                if img_file.endswith(('.jpg', '.jpeg', '.png')):
+                    ann_path = os.path.splitext(os.path.join(folder_path, img_file))[0] + '.txt'
+                    if os.path.exists(ann_path):
+                        with open(ann_path, 'r') as file:
+                            for line in file:
+                                class_id = int(line.strip().split()[0])
+                                max_class_id = max(max_class_id, class_id)
+            
+            num_classes = max_class_id + 1
+        
+        print(f"Number of classes detected: {num_classes}")
+        
+        # Determine maximum number of boxes per image
+        max_boxes = 0
+        for img_file in os.listdir(folder_path):
+            if img_file.endswith(('.jpg', '.jpeg', '.png')):
+                ann_path = os.path.splitext(os.path.join(folder_path, img_file))[0] + '.txt'
+                if os.path.exists(ann_path):
+                    with open(ann_path, 'r') as file:
+                        box_count = sum(1 for _ in file)
+                        max_boxes = max(max_boxes, box_count)
+        
+        # Set reasonable minimum and maximum
+        max_boxes = max(max_boxes, 1)  # At least 1 box
+        max_boxes = min(max_boxes, 100)  # Cap at 100 boxes per image for memory efficiency
+        
+        print(f"Maximum boxes per image: {max_boxes}")
 
-        # check how many classes
-        with open('./dataset/train/label.txt', 'r') as file:
-            line_count = sum(1 for line in file)
-        num_classes = line_count
-
+        # Create the model with updated parameter for number of boxes
         model = constructdl_od.construct(
-            config.model, img_shape, num_classes)
+            config.model, input_shape, num_classes, max_boxes)
         model.summary()
 
-        # Compile the model
+        # Compile the model with the correct output names
         model.compile(
             optimizer=optimizer,
             loss={
-                'bbox_output': 'mse',  # Regression loss for bounding boxes
-                'class_output': 'categorical_crossentropy'  # Classification loss
+                'bbox_reshape': 'mse',  # Regression loss for bounding boxes
+                'class_activation': 'categorical_crossentropy'  # Classification loss
             },
-            loss_weights={'bbox_output': 1.0, 'class_output': 1.0},
-            metrics={'class_output': 'accuracy'}
+            loss_weights={'bbox_reshape': 1.0, 'class_activation': 1.0},
+            metrics={'class_activation': 'accuracy'}
         )
 
         # Load dataset for training and validation
         X_train, y_bboxes_train, y_classes_train = self.load_dataset(
-            './dataset/train', input_shape)
+            './dataset/train', (input_shape[1], input_shape[0]), num_classes, max_boxes)
         X_valid, y_bboxes_valid, y_classes_valid = self.load_dataset(
-            './dataset/valid', input_shape)
+            './dataset/valid', (input_shape[1], input_shape[0]), num_classes, max_boxes)
 
+        print("X_train:", X_train.shape)
+        print("y_bboxes_train:", y_bboxes_train.shape)
+        print("y_classes_train:", y_classes_train.shape)
+        
         # Train with explicit validation data
         history = model.fit(
             X_train,
-            {'bbox_output': y_bboxes_train, 'class_output': y_classes_train},
+            {'bbox_reshape': y_bboxes_train, 'class_activation': y_classes_train},
             batch_size=config_training.batch_size,
             epochs=config_training.epochs,
             validation_data=(
-                X_valid, {'bbox_output': y_bboxes_valid, 'class_output': y_classes_valid})
+                X_valid, {'bbox_reshape': y_bboxes_valid, 'class_activation': y_classes_valid})
         )
 
         model.save("model.h5")
+        
+        return history, model
 
     def get_image_paths(self, dataset_path):
         """Returns image file paths and corresponding annotation files."""
