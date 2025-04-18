@@ -259,7 +259,8 @@ def prepare_dataset(request: PrepareDatasetRequest):
         "valid": request.valid_data
     }
     
-    sorted_labels = sorted(request.labels)
+    # sorted_labels = sorted(request.labels)
+    sorted_labels = request.labels
 
     if request.type in ["object_detection", "segmentation"]:
         label_content = "\n".join(sorted_labels)

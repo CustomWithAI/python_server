@@ -1,9 +1,9 @@
-from fastapi import FastAPI, Form, UploadFile
-import json
+from fastapi import FastAPI, Form, File, UploadFile, HTTPException
 import os
 import glob
 import subprocess
 
+from typing import Annotated
 from app.services.dataset.dataset import preprocess_all_dataset, augment_dataset_class, augment_dataset_obj, augment_dataset_seg, prepare_dataset
 from app.services.model.training import MLTraining, DLTrainingPretrained, ConstructTraining
 from app.models.ml import MachineLearningClassificationRequest
@@ -15,6 +15,7 @@ from app.models.dl import (
     DeepLearningObjectDetectionConstructRequest,
 )
 from app.models.dataset import DatasetConfigRequest, PrepareDatasetRequest
+from app.models.use_model import UseModelRequest
 from app.services.model.use_model import UseModel
 from app.helpers.models import delete_all_models, get_model
 
@@ -135,39 +136,36 @@ async def config_dataset(config: DatasetConfigRequest):
 
 
 @app.post("/use-model")
-async def use_all_model(img: UploadFile, config: str = Form(...)):
-    convert_config = json.loads(config)
-    model_type = convert_config["model"]
-    if model_type == "dl_od_pt" or model_type == "dl_seg":
-        version = convert_config["version"]
-    convert_img = await img.read()
+async def use_all_model(
+    type: Annotated[str, Form(...)],
+    img: UploadFile = File(...),
+    model: UploadFile = File(...),
+    version: str | None = Form(None),
+):
+    payload = UseModelRequest(type=type, version=version)
+    image_bytes = await img.read()
+    model_bytes = await model.read()
 
-    usemodel = UseModel()
+    use_model = UseModel(model_bytes=model_bytes)
 
-    if model_type == "ml":
-        prediction = usemodel.use_ml(convert_img)
+    if payload.type == "ml":
+        prediction = use_model.use_ml(image_bytes)
         return {"prediction": prediction.tolist()}
 
-    if model_type == "dl_cls":
-        prediction = usemodel.use_dl_cls(convert_img)
+    if payload.type == "dl_cls":
+        prediction = use_model.use_dl_cls(image_bytes)
         return {"prediction": int(prediction)}
 
-    if model_type == "dl_od":
-        prediction = usemodel.use_dl_od_pt(convert_img, version)
-        return {
-            "prediction": prediction
-        }
+    if payload.type == "dl_od_pt":
+        prediction = use_model.use_dl_od_pt(image_bytes, payload.version)
+        return {"prediction": prediction}
 
-    if model_type == "dl_od_con":
-        prediction = usemodel.use_dl_od_con(convert_img)
-        return {
-            "prediction": prediction
-        }
+    if payload.type == "dl_od_con":
+        prediction = use_model.use_dl_od_con(image_bytes)
+        return {"prediction": prediction}
 
-    if model_type == "dl_seg":
-        prediction = usemodel.use_dl_seg(convert_img, version)
-        return {
-            "prediction": prediction
-        }
+    if payload.type == "dl_seg":
+        prediction = use_model.use_dl_seg(image_bytes, payload.version)
+        return {"prediction": prediction}
 
-    return {"error": "Invalid model type"}
+    raise HTTPException(400, "Invalid Model Type")
