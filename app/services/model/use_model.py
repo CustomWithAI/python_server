@@ -165,8 +165,8 @@ class UseModel:
         shutil.rmtree("./runs/detect/predict2", ignore_errors=True)
 
         return detections
-
     def use_dl_od_con(self, img_bytes: bytes):
+        print(f"Image bytes length: {len(img_bytes)}")
         with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as temp_model:
             temp_model.write(self.model_bytes)
             model_path = temp_model.name
@@ -183,14 +183,27 @@ class UseModel:
         processed_img = self.preprocess_image(img_bytes, input_shape)
 
         predictions = self.model.predict(processed_img)
-        bbox_pred = predictions[0]
-        class_pred = predictions[1]
+        print("Predictions:", [p.shape for p in predictions])
 
+        # Handle the predictions dynamically based on their shape
+        bbox_pred = predictions[0][0]  # Get the first batch of bbox predictions 
+        class_pred = predictions[1][0]  # Get the first batch of class predictions
+        
+        # Determine the number of detections based on prediction shape
+        num_detections = bbox_pred.shape[0]  # First dimension is the number of boxes
+        
         detections = []
-        for i in range(len(bbox_pred)):
-            x_center, y_center, width, height = bbox_pred[i]
+        for i in range(num_detections):
+            # Get classification data for this detection
             class_probs = class_pred[i]
             class_id = int(class_probs.argmax())
+            confidence = float(class_probs[class_id])
+
+            if confidence < 0.1:
+                continue  # skip low-confidence detections
+
+            # Get bounding box data
+            x_center, y_center, width, height = bbox_pred[i]
 
             detections.append({
                 "class_id": class_id,
@@ -200,7 +213,7 @@ class UseModel:
                     "width": float(width),
                     "height": float(height),
                 },
-                "confidence": float(class_probs[class_id])
+                "confidence": confidence
             })
 
         return detections

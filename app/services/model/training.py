@@ -854,6 +854,8 @@ class ConstructTraining():
         )
 
         model.save("model.h5")
+
+        model = None
         
         return history, model
 
