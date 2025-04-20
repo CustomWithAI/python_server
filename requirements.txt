@@ -9,3 +9,5 @@ scikit-image
 tensorflow
 PyYAML
 joblib
+matplotlib
+seaborn

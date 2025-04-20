@@ -25,6 +25,9 @@ from sklearn.preprocessing import LabelEncoder
 import joblib
 import numpy as np
 import os
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from app.services.model.ml import MlModel
 from app.services.model.dl_pretrained import DlModel
@@ -250,6 +253,61 @@ class MLTraining():
         val_accuracy = accuracy_score(y_val, y_val_pred)
         print(f"Validation Accuracy: {val_accuracy}")
 
+        # Create output directory
+        os.makedirs("evaluation_results", exist_ok=True)
+
+        # Evaluate on validation data
+        y_val_pred = model.predict(X_val)
+
+        val_accuracy = accuracy_score(y_val, y_val_pred)
+        val_precision = precision_score(y_val, y_val_pred, average='weighted', zero_division=0)
+        val_recall = recall_score(y_val, y_val_pred, average='weighted', zero_division=0)
+        val_f1 = f1_score(y_val, y_val_pred, average='weighted', zero_division=0)
+        cm = confusion_matrix(y_val, y_val_pred)
+
+        # Print scores
+        print(f"Validation Accuracy: {val_accuracy:.4f}")
+        print(f"Precision: {val_precision:.4f}")
+        print(f"Recall: {val_recall:.4f}")
+        print(f"F1 Score: {val_f1:.4f}")
+
+        # Save metrics to a text file
+        with open("evaluation_results/metrics.txt", "w") as f:
+            f.write(f"Validation Accuracy: {val_accuracy:.4f}\n")
+            f.write(f"Precision: {val_precision:.4f}\n")
+            f.write(f"Recall: {val_recall:.4f}\n")
+            f.write(f"F1 Score: {val_f1:.4f}\n")
+
+        # Save Confusion Matrix as an image
+        plt.figure(figsize=(10, 7))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+        plt.title('Confusion Matrix')
+        plt.xlabel('Predicted')
+        plt.ylabel('True')
+        plt.savefig("evaluation_results/confusion_matrix.png")
+        plt.close()
+
+        # Save loss curve if available
+        if hasattr(model, "loss_curve_"):
+            plt.figure()
+            plt.plot(model.loss_curve_)
+            plt.title("Loss Curve (Per Epoch)")
+            plt.xlabel("Epochs")
+            plt.ylabel("Loss")
+            plt.grid(True)
+            plt.savefig("evaluation_results/loss_curve.png")
+            plt.close()
+
+        # Save validation scores curve if available
+        if hasattr(model, "validation_scores_"):
+            plt.figure()
+            plt.plot(model.validation_scores_)
+            plt.title("Validation Accuracy (Per Epoch)")
+            plt.xlabel("Epochs")
+            plt.ylabel("Accuracy")
+            plt.grid(True)
+            plt.savefig("evaluation_results/accuracy_per_epoch.png")
+            plt.close()
 
 class DLTrainingPretrained():
 
@@ -481,6 +539,78 @@ class DLTrainingPretrained():
         # Save the model
         model.save("model.h5")
 
+        # Evaluate on validation set
+        y_pred_probs = model.predict(X_val)
+        y_pred = y_pred_probs.argmax(axis=1)
+        y_true = y_val.argmax(axis=1)
+
+        # Metrics
+        acc = accuracy_score(y_true, y_pred)
+        precision = precision_score(y_true, y_pred, average='macro')
+        recall = recall_score(y_true, y_pred, average='macro')
+        f1 = f1_score(y_true, y_pred, average='macro')
+
+        print("\n📊 Evaluation Metrics:")
+        print(f"Accuracy:  {acc:.4f}")
+        print(f"Precision: {precision:.4f}")
+        print(f"Recall:    {recall:.4f}")
+        print(f"F1 Score:  {f1:.4f}")
+
+        # Save metrics to a text file
+        with open("evaluation_results/metrics.txt", "w") as f:
+            f.write(f"Validation Accuracy: {acc:.4f}\n")
+            f.write(f"Precision: {precision:.4f}\n")
+            f.write(f"Recall: {recall:.4f}\n")
+            f.write(f"F1 Score: {f1:.4f}\n")
+            
+        # Create evaluation result folder if it doesn't exist
+        result_dir = "./evaluation_results"
+        os.makedirs(result_dir, exist_ok=True)
+
+        # Plot and save training accuracy and loss
+        def save_training_plots(history, result_dir):
+            plt.figure(figsize=(12, 5))
+
+            # Accuracy
+            plt.subplot(1, 2, 1)
+            plt.plot(history.history['accuracy'], label='Train Accuracy')
+            plt.plot(history.history['val_accuracy'], label='Val Accuracy')
+            plt.title('Accuracy per Epoch')
+            plt.xlabel('Epoch')
+            plt.ylabel('Accuracy')
+            plt.legend()
+
+            # Loss
+            plt.subplot(1, 2, 2)
+            plt.plot(history.history['loss'], label='Train Loss')
+            plt.plot(history.history['val_loss'], label='Val Loss')
+            plt.title('Loss per Epoch')
+            plt.xlabel('Epoch')
+            plt.ylabel('Loss')
+            plt.legend()
+
+            plt.tight_layout()
+            plt.savefig(os.path.join(result_dir, "accuracy_loss_per_epoch.png"))
+            plt.close()
+
+        save_training_plots(history, result_dir)
+
+        # Confusion matrix
+        def save_confusion_matrix(y_true, y_pred, class_dict, result_dir):
+            cm = confusion_matrix(y_true, y_pred)
+            plt.figure(figsize=(8, 6))
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                        xticklabels=list(class_dict.keys()),
+                        yticklabels=list(class_dict.keys()))
+            plt.title('Confusion Matrix')
+            plt.xlabel('Predicted')
+            plt.ylabel('True')
+            plt.tight_layout()
+            plt.savefig(os.path.join(result_dir, "confusion_matrix.png"))
+            plt.close()
+
+        save_confusion_matrix(y_true, y_pred, class_dict, result_dir)
+
         return history
 
 
@@ -579,6 +709,78 @@ class ConstructTraining():
             X_val, y_val), epochs=config_training.epochs, batch_size=config_training.batch_size, callbacks=callbacks)
 
         model.save("model.h5")
+
+        # Evaluate on validation set
+        y_pred_probs = model.predict(X_val)
+        y_pred = y_pred_probs.argmax(axis=1)
+        y_true = y_val.argmax(axis=1)
+
+        # Metrics
+        acc = accuracy_score(y_true, y_pred)
+        precision = precision_score(y_true, y_pred, average='macro')
+        recall = recall_score(y_true, y_pred, average='macro')
+        f1 = f1_score(y_true, y_pred, average='macro')
+
+        print("\n📊 Evaluation Metrics:")
+        print(f"Accuracy:  {acc:.4f}")
+        print(f"Precision: {precision:.4f}")
+        print(f"Recall:    {recall:.4f}")
+        print(f"F1 Score:  {f1:.4f}")
+
+        # Save metrics to a text file
+        with open("evaluation_results/metrics.txt", "w") as f:
+            f.write(f"Validation Accuracy: {acc:.4f}\n")
+            f.write(f"Precision: {precision:.4f}\n")
+            f.write(f"Recall: {recall:.4f}\n")
+            f.write(f"F1 Score: {f1:.4f}\n")
+            
+        # Create evaluation result folder if it doesn't exist
+        result_dir = "./evaluation_results"
+        os.makedirs(result_dir, exist_ok=True)
+
+        # Plot and save training accuracy and loss
+        def save_training_plots(history, result_dir):
+            plt.figure(figsize=(12, 5))
+
+            # Accuracy
+            plt.subplot(1, 2, 1)
+            plt.plot(history.history['accuracy'], label='Train Accuracy')
+            plt.plot(history.history['val_accuracy'], label='Val Accuracy')
+            plt.title('Accuracy per Epoch')
+            plt.xlabel('Epoch')
+            plt.ylabel('Accuracy')
+            plt.legend()
+
+            # Loss
+            plt.subplot(1, 2, 2)
+            plt.plot(history.history['loss'], label='Train Loss')
+            plt.plot(history.history['val_loss'], label='Val Loss')
+            plt.title('Loss per Epoch')
+            plt.xlabel('Epoch')
+            plt.ylabel('Loss')
+            plt.legend()
+
+            plt.tight_layout()
+            plt.savefig(os.path.join(result_dir, "accuracy_loss_per_epoch.png"))
+            plt.close()
+
+        save_training_plots(history, result_dir)
+
+        # Confusion matrix
+        def save_confusion_matrix(y_true, y_pred, class_dict, result_dir):
+            cm = confusion_matrix(y_true, y_pred)
+            plt.figure(figsize=(8, 6))
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                        xticklabels=list(class_dict.keys()),
+                        yticklabels=list(class_dict.keys()))
+            plt.title('Confusion Matrix')
+            plt.xlabel('Predicted')
+            plt.ylabel('True')
+            plt.tight_layout()
+            plt.savefig(os.path.join(result_dir, "confusion_matrix.png"))
+            plt.close()
+
+        save_confusion_matrix(y_true, y_pred, class_dict, result_dir)
 
         return history
 
@@ -680,6 +882,80 @@ class ConstructTraining():
         # Train the model
         history = model.fit(X_train, y_train, validation_data=(
             X_val, y_val), epochs=config_training.epochs, batch_size=config_training.batch_size, callbacks=callbacks)
+        
+        model.save("model.h5")
+
+        # Evaluate
+        y_pred_probs = model.predict(X_val)
+        y_pred = y_pred_probs.argmax(axis=1)
+
+        y_val_classes = y_val.argmax(axis=1)
+
+        acc = accuracy_score(y_val_classes, y_pred)
+        precision = precision_score(y_val_classes, y_pred, average='macro')
+        recall = recall_score(y_val_classes, y_pred, average='macro')
+        f1 = f1_score(y_val_classes, y_pred, average='macro')
+
+        print("\n📊 Evaluation Metrics:")
+        print(f"Accuracy:  {acc:.4f}")
+        print(f"Precision: {precision:.4f}")
+        print(f"Recall:    {recall:.4f}")
+        print(f"F1 Score:  {f1:.4f}")
+
+        # Save metrics to a text file
+        with open("evaluation_results/metrics.txt", "w") as f:
+            f.write(f"Validation Accuracy: {acc:.4f}\n")
+            f.write(f"Precision: {precision:.4f}\n")
+            f.write(f"Recall: {recall:.4f}\n")
+            f.write(f"F1 Score: {f1:.4f}\n")
+            
+        # Save graphs
+        result_dir = "./evaluation_results"
+        os.makedirs(result_dir, exist_ok=True)
+
+        # Accuracy and loss graph
+        def save_training_plots(history, result_dir):
+            plt.figure(figsize=(12, 5))
+
+            # Accuracy
+            plt.subplot(1, 2, 1)
+            plt.plot(history.history['accuracy'], label='Train Accuracy')
+            plt.plot(history.history['val_accuracy'], label='Val Accuracy')
+            plt.title('Accuracy per Epoch')
+            plt.xlabel('Epoch')
+            plt.ylabel('Accuracy')
+            plt.legend()
+
+            # Loss
+            plt.subplot(1, 2, 2)
+            plt.plot(history.history['loss'], label='Train Loss')
+            plt.plot(history.history['val_loss'], label='Val Loss')
+            plt.title('Loss per Epoch')
+            plt.xlabel('Epoch')
+            plt.ylabel('Loss')
+            plt.legend()
+
+            plt.tight_layout()
+            plt.savefig(os.path.join(result_dir, "accuracy_loss_per_epoch_featex.png"))
+            plt.close()
+
+        save_training_plots(history, result_dir)
+
+        # Confusion matrix
+        def save_confusion_matrix(y_true, y_pred, labels, result_dir):
+            cm = confusion_matrix(y_true, y_pred)
+            plt.figure(figsize=(8, 6))
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                        xticklabels=labels, yticklabels=labels)
+            plt.title('Confusion Matrix')
+            plt.xlabel('Predicted')
+            plt.ylabel('True')
+            plt.tight_layout()
+            plt.savefig(os.path.join(result_dir, "confusion_matrix_featex.png"))
+            plt.close()
+
+        label_names = encoder.classes_
+        save_confusion_matrix(y_val_classes, y_pred, label_names, result_dir)
 
         return history
 
@@ -779,7 +1055,6 @@ class ConstructTraining():
         img_shape = img.shape
         input_shape = img_shape
         
-        # Determine the number of classes
         # Option 1: Read from the labels file (assuming it contains all class names)
         try:
             with open('./dataset/classes.txt', 'r') as file:
@@ -857,7 +1132,7 @@ class ConstructTraining():
 
         model = None
         
-        return history, model
+        return history
 
     def get_image_paths(self, dataset_path):
         """Returns image file paths and corresponding annotation files."""
