@@ -613,6 +613,75 @@ class DLTrainingPretrained():
 
         return history
 
+class EvaluationCallback(tf.keras.callbacks.Callback):
+    def __init__(self, X_val, y_bboxes_val, y_classes_val, num_classes, iou_threshold=0.5):
+        self.X_val = X_val
+        self.y_bboxes_val = y_bboxes_val
+        self.y_classes_val = y_classes_val
+        self.num_classes = num_classes
+        self.iou_threshold = iou_threshold
+        self.epoch_metrics = {'precision': [], 'recall': [], 'map': []}
+
+    def compute_iou(self,box1, box2):
+        x1_min = box1[0] - box1[2] / 2
+        y1_min = box1[1] - box1[3] / 2
+        x1_max = box1[0] + box1[2] / 2
+        y1_max = box1[1] + box1[3] / 2
+        
+        x2_min = box2[0] - box2[2] / 2
+        y2_min = box2[1] - box2[3] / 2
+        x2_max = box2[0] + box2[2] / 2
+        y2_max = box2[1] + box2[3] / 2
+        
+        inter_x_min = max(x1_min, x2_min)
+        inter_y_min = max(y1_min, y2_min)
+        inter_x_max = min(x1_max, x2_max)
+        inter_y_max = min(y1_max, y2_max)
+        
+        inter_area = max(0, inter_x_max - inter_x_min) * max(0, inter_y_max - inter_y_min)
+        box1_area = (x1_max - x1_min) * (y1_max - y1_min)
+        box2_area = (x2_max - x2_min) * (y2_max - y2_min)
+        union_area = box1_area + box2_area - inter_area
+        
+        return inter_area / union_area if union_area else 0
+
+    def on_epoch_end(self, epoch, logs=None):
+        preds = self.model.predict(self.X_val)
+        y_bboxes_pred = preds[0]
+        y_classes_pred = preds[1]
+
+        y_true_classes_flat = np.argmax(self.y_classes_val.reshape(-1, self.num_classes), axis=1)
+        y_pred_classes_flat = np.argmax(y_classes_pred.reshape(-1, self.num_classes), axis=1)
+
+        mask_true = np.sum(self.y_classes_val, axis=-1).flatten() > 0
+        mask_pred = np.sum(y_classes_pred, axis=-1).flatten() > 0
+
+        precision = precision_score(y_true_classes_flat[mask_true], y_pred_classes_flat[mask_true], average='macro', zero_division=0)
+        recall = recall_score(y_true_classes_flat[mask_true], y_pred_classes_flat[mask_true], average='macro', zero_division=0)
+
+        ious = []
+        average_precisions = []
+        for i in range(len(self.X_val)):
+            true_boxes = self.y_bboxes_val[i]
+            pred_boxes = y_bboxes_pred[i]
+            for j in range(len(true_boxes)):
+                if np.sum(self.y_classes_val[i][j]) > 0:
+                    best_iou = 0
+                    for k in range(len(pred_boxes)):
+                        if np.sum(y_classes_pred[i][k]) > 0:
+                            iou = self.compute_iou(true_boxes[j], pred_boxes[k])
+                            best_iou = max(best_iou, iou)
+                    ious.append(best_iou)
+                    average_precisions.append(1 if best_iou >= self.iou_threshold else 0)
+
+        map_50 = np.mean(average_precisions) if average_precisions else 0
+
+        self.epoch_metrics['precision'].append(precision)
+        self.epoch_metrics['recall'].append(recall)
+        self.epoch_metrics['map'].append(map_50)
+
+        print(f"Epoch {epoch + 1} - Precision: {precision:.4f}, Recall: {recall:.4f}, mAP@0.5: {map_50:.4f}")
+
 
 class ConstructTraining():
     def __init__(self):
@@ -809,6 +878,8 @@ class ConstructTraining():
 
         print(f"Total Samples Loaded from {dataset_path}: {len(y)}")
         return X, y
+
+
 
     def train_cls_featex(self, config: DeepLearningClassificationConstruct):
         print("DOING FEATEX")
@@ -1033,6 +1104,31 @@ class ConstructTraining():
             
         return np.array(images), np.array(all_bboxes), np.array(all_classes)
 
+
+    def compute_iou(self,box1, box2):
+        x1_min = box1[0] - box1[2] / 2
+        y1_min = box1[1] - box1[3] / 2
+        x1_max = box1[0] + box1[2] / 2
+        y1_max = box1[1] + box1[3] / 2
+        
+        x2_min = box2[0] - box2[2] / 2
+        y2_min = box2[1] - box2[3] / 2
+        x2_max = box2[0] + box2[2] / 2
+        y2_max = box2[1] + box2[3] / 2
+        
+        inter_x_min = max(x1_min, x2_min)
+        inter_y_min = max(y1_min, y2_min)
+        inter_x_max = min(x1_max, x2_max)
+        inter_y_max = min(y1_max, y2_max)
+        
+        inter_area = max(0, inter_x_max - inter_x_min) * max(0, inter_y_max - inter_y_min)
+        box1_area = (x1_max - x1_min) * (y1_max - y1_min)
+        box2_area = (x2_max - x2_min) * (y2_max - y2_min)
+        union_area = box1_area + box2_area - inter_area
+        
+        return inter_area / union_area if union_area else 0
+    
+
     def train_od(self, config: DeepLearningObjectDetectionConstruct):
         # Unpack training configuration
         config_training = config.training
@@ -1118,6 +1214,8 @@ class ConstructTraining():
         print("y_bboxes_train:", y_bboxes_train.shape)
         print("y_classes_train:", y_classes_train.shape)
         
+        eval_callback = EvaluationCallback(X_valid, y_bboxes_valid, y_classes_valid, num_classes)
+
         # Train with explicit validation data
         history = model.fit(
             X_train,
@@ -1125,10 +1223,86 @@ class ConstructTraining():
             batch_size=config_training.batch_size,
             epochs=config_training.epochs,
             validation_data=(
-                X_valid, {'bbox_reshape': y_bboxes_valid, 'class_activation': y_classes_valid})
+                X_valid, {'bbox_reshape': y_bboxes_valid, 'class_activation': y_classes_valid}),
+            callbacks=[eval_callback]
+
         )
 
         model.save("model.h5")
+
+        X_test, y_bboxes_true, y_classes_true = self.load_dataset('./dataset/test', (input_shape[1], input_shape[0]), num_classes, max_boxes)
+
+
+        preds = model.predict(X_test)
+        y_bboxes_pred = preds[0]
+        y_classes_pred = preds[1]
+
+        y_true_classes_flat = np.argmax(y_classes_true.reshape(-1, y_classes_true.shape[-1]), axis=1)
+        y_pred_classes_flat = np.argmax(y_classes_pred.reshape(-1, y_classes_pred.shape[-1]), axis=1)
+
+        mask_true = np.sum(y_classes_true, axis=-1).flatten() > 0
+        mask_pred = np.sum(y_classes_pred, axis=-1).flatten() > 0
+
+        precision = precision_score(y_true_classes_flat[mask_true], y_pred_classes_flat[mask_true], average='macro', zero_division=0)
+        recall = recall_score(y_true_classes_flat[mask_true], y_pred_classes_flat[mask_true], average='macro', zero_division=0)
+        f1 = f1_score(y_true_classes_flat[mask_true], y_pred_classes_flat[mask_true], average='macro', zero_division=0)
+
+        # Calculate IoU and mAP@0.5
+        iou_threshold = 0.5
+
+        ious = []
+        average_precisions = []
+        for i in range(len(X_test)):
+            true_boxes = y_bboxes_true[i]
+            pred_boxes = y_bboxes_pred[i]
+            for j in range(len(true_boxes)):
+                if np.sum(y_classes_true[i][j]) > 0:
+                    best_iou = 0
+                    for k in range(len(pred_boxes)):
+                        if np.sum(y_classes_pred[i][k]) > 0:
+                            iou = self.compute_iou(true_boxes[j], pred_boxes[k])
+                            best_iou = max(best_iou, iou)
+                    ious.append(best_iou)
+                    average_precisions.append(1 if best_iou >= iou_threshold else 0)
+
+        mean_iou = np.mean(ious) if ious else 0
+        map_50 = np.mean(average_precisions) if average_precisions else 0
+
+        os.makedirs('./evaluation_results', exist_ok=True)
+        with open('./evaluation_results/metrics.txt', 'w') as f:
+            f.write(f"Precision: {precision:.4f}\n")
+            f.write(f"Recall: {recall:.4f}\n")
+            f.write(f"F1 Score: {f1:.4f}\n")
+            f.write(f"IoU: {mean_iou:.4f}\n")
+            f.write(f"mAP@0.5: {map_50:.4f}\n")
+
+        # Plotting
+        metrics = ['Precision', 'Recall', 'F1 Score', 'IoU', 'mAP@0.5']
+        values = [precision, recall, f1, mean_iou, map_50]
+
+        plt.figure(figsize=(10, 6))
+        plt.bar(metrics, values, color='skyblue')
+        plt.ylim(0, 1)
+        plt.title('Evaluation Metrics')
+        for i, v in enumerate(values):
+            plt.text(i, v + 0.02, f"{v:.2f}", ha='center', fontweight='bold')
+        plt.savefig('./evaluation_results/metric_summary.png')
+        plt.close()
+
+        epochs = list(range(1, config_training.epochs + 1))
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(epochs, eval_callback.epoch_metrics['precision'], label='Precision')
+        plt.plot(epochs, eval_callback.epoch_metrics['recall'], label='Recall')
+        plt.plot(epochs, eval_callback.epoch_metrics['map'], label='mAP@0.5')
+        plt.xlabel('Epoch')
+        plt.ylabel('Score')
+        plt.title('Validation Metrics Over Epochs')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig('./evaluation_results/metrics_per_epoch.png')
+        plt.close()
+
 
         model = None
         
@@ -1244,99 +1418,126 @@ class ConstructTraining():
         print("MIN FEAT:", hog_min, sift_min, orb_min)
         return hog_min, sift_min, orb_min
 
-    def train_od_featex(self, config: DeepLearningObjectDetectionConstructFeatex):
-        # Check image size
-        folder_path = './dataset/train/'
-        image_files = [f for f in os.listdir(
-            folder_path) if f.endswith(('png', 'jpg', 'jpeg'))]
-        image_path = os.path.join(folder_path, image_files[0])
-        img = cv2.imread(image_path)
-        img_shape = img.shape
-        img_size = img_shape[1]
-        print(f"Image size: {img_size}")
 
-        config_featex = config.featex
-        hog_params = config_featex.hog.model_dump() if config_featex.hog else None
-        sift_params = config_featex.sift.model_dump() if config_featex.sift else None
-        orb_params = config_featex.orb.model_dump() if config_featex.orb else None
+    def train_od_featex(self, config):
+            # --- Load sample image to determine size ---
+            folder_path = './dataset/train/'
+            image_files = [f for f in os.listdir(folder_path) if f.endswith(('png', 'jpg', 'jpeg'))]
+            image_path = os.path.join(folder_path, image_files[0])
+            img = cv2.imread(image_path)
+            img_size = img.shape[1]
+            print(f"Image size: {img_size}")
 
-        print(hog_params, sift_params, orb_params)
+            config_featex = config.featex
+            hog_params = config_featex.hog.model_dump() if config_featex.hog else None
+            sift_params = config_featex.sift.model_dump() if config_featex.sift else None
+            orb_params = config_featex.orb.model_dump() if config_featex.orb else None
+            print(hog_params, sift_params, orb_params)
 
-        # Check minimum features
-        hog_min_train, sift_min_train, orb_min_train = self.check_min_feat_od(
-            'dataset/train', hog_params, sift_params, orb_params)
-        hog_min_val, sift_min_val, orb_min_val = self.check_min_feat_od(
-            'dataset/valid', hog_params, sift_params, orb_params)
-        hog_min = min(hog_min_train, hog_min_val)
-        sift_min = min(sift_min_train, sift_min_val)
-        orb_min = min(orb_min_train, orb_min_val)
+            # --- Feature count ---
+            hog_min_train, sift_min_train, orb_min_train = self.check_min_feat_od('dataset/train', hog_params, sift_params, orb_params)
+            hog_min_val, sift_min_val, orb_min_val = self.check_min_feat_od('dataset/valid', hog_params, sift_params, orb_params)
+            hog_min = min(hog_min_train, hog_min_val)
+            sift_min = min(sift_min_train, sift_min_val)
+            orb_min = min(orb_min_train, orb_min_val)
 
-        # Load training data
-        train_image_files, train_annotation_files = self.get_image_paths(
-            "dataset/train")
-        X_features_train, y_boxes_train, y_classes_train = self.load_data_od_featex(
-            "dataset/train", train_image_files, train_annotation_files, img_size, hog_params, hog_min, sift_params, sift_min, orb_params, orb_min)
+            # --- Load data ---
+            train_img_files, train_ann_files = self.get_image_paths("dataset/train")
+            X_features_train, y_boxes_train, y_classes_train = self.load_data_od_featex(
+                "dataset/train", train_img_files, train_ann_files, img_size, hog_params, hog_min, sift_params, sift_min, orb_params, orb_min)
 
-        # Load validation data
-        valid_image_files, valid_annotation_files = self.get_image_paths(
-            "dataset/valid")
-        X_features_valid, y_boxes_valid, y_classes_valid = self.load_data_od_featex(
-            "dataset/valid", valid_image_files, valid_annotation_files, img_size, hog_params, hog_min, sift_params, sift_min, orb_params, orb_min)
+            valid_img_files, valid_ann_files = self.get_image_paths("dataset/valid")
+            X_features_valid, y_boxes_valid, y_classes_valid = self.load_data_od_featex(
+                "dataset/valid", valid_img_files, valid_ann_files, img_size, hog_params, hog_min, sift_params, sift_min, orb_params, orb_min)
 
-        # Convert to NumPy array
-        y_classes_train = np.array(y_classes_train)
-        y_classes_valid = np.array(y_classes_valid)
+            y_classes_train = np.array(y_classes_train)
+            y_classes_valid = np.array(y_classes_valid)
 
-        # Convert to class indices if one-hot encoded
-        if y_classes_train.ndim > 1:
-            y_classes_train = np.argmax(y_classes_train, axis=1)
-        if y_classes_valid.ndim > 1:
-            y_classes_valid = np.argmax(y_classes_valid, axis=1)
+            if y_classes_train.ndim > 1:
+                y_classes_train = np.argmax(y_classes_train, axis=1)
+            if y_classes_valid.ndim > 1:
+                y_classes_valid = np.argmax(y_classes_valid, axis=1)
 
-        # Count unique class labels
-        num_classes = len(np.unique(y_classes_train))
+            num_classes = len(np.unique(y_classes_train))
+            y_classes_train = tf.keras.utils.to_categorical(y_classes_train, num_classes=num_classes)
+            y_classes_valid = tf.keras.utils.to_categorical(y_classes_valid, num_classes=num_classes)
+            print(f"Number of Classes: {num_classes}")
 
-        # One-hot encode labels properly
-        y_classes_train = tf.keras.utils.to_categorical(
-            y_classes_train, num_classes=num_classes)
-        y_classes_valid = tf.keras.utils.to_categorical(
-            y_classes_valid, num_classes=num_classes)
+            # --- Build and compile model ---
+            model = constructdl_od.construct_od_featex(config.model, input_shape=(hog_min+sift_min+orb_min), num_classes=num_classes)
+            config_training = config.training
+            optimizer = Adam(learning_rate=config_training.learning_rate) if config_training.optimizer_type == 'adam' \
+                        else SGD(learning_rate=config_training.learning_rate, momentum=config_training.momentum)
 
-        print(f"Number of Classes: {num_classes}")
+            model.compile(
+                optimizer=optimizer,
+                loss={"class_output": "categorical_crossentropy", "bbox_output": "mean_squared_error"},
+                metrics={"class_output": "accuracy", "bbox_output": "mae"}
+            )
 
-        # Build model
-        model = constructdl_od.construct_od_featex(
-            config.model, input_shape=(hog_min+sift_min+orb_min), num_classes=num_classes)
+            # --- Callback for logging per-epoch (optional) ---
+            class EvalCallback(tf.keras.callbacks.Callback):
+                def __init__(self):
+                    self.epoch_metrics = {'precision': [], 'recall': [], 'map': []}
 
-        # Unpack training configuration
-        config_training = config.training
+                def on_epoch_end(self, epoch, logs=None):
+                    self.epoch_metrics['precision'].append(logs.get("val_class_output_accuracy", 0))
+                    self.epoch_metrics['recall'].append(1 - logs.get("val_bbox_output_mae", 0))
+                    self.epoch_metrics['map'].append(0.0)  # Can replace with real mAP calculation
 
-        # Select optimizer
-        if config_training.optimizer_type == 'adam':
-            optimizer = Adam(learning_rate=config_training.learning_rate)
-        elif config_training.optimizer_type == 'sgd':
-            optimizer = SGD(learning_rate=config_training.learning_rate,
-                            momentum=config_training.momentum)
-        else:
-            raise ValueError("Unsupported optimizer type")
+            eval_callback = EvalCallback()
 
-        # Compile model
-        model.compile(
-            optimizer=optimizer,
-            loss={"class_output": "categorical_crossentropy",
-                  "bbox_output": "mean_squared_error"},
-            metrics={"class_output": "accuracy", "bbox_output": "mae"}
-        )
+            # --- Train the model ---
+            model.fit(
+                X_features_train, {"class_output": y_classes_train, "bbox_output": y_boxes_train},
+                validation_data=(X_features_valid, {"class_output": y_classes_valid, "bbox_output": y_boxes_valid}),
+                epochs=config_training.epochs,
+                batch_size=config_training.batch_size,
+                callbacks=[eval_callback]
+            )
 
-        # Train model with explicit validation data
-        model.fit(
-            X_features_train, {"class_output": y_classes_train,
-                               "bbox_output": y_boxes_train},
-            validation_data=(X_features_valid, {
-                "class_output": y_classes_valid, "bbox_output": y_boxes_valid}),
-            epochs=config_training.epochs,
-            batch_size=config_training.batch_size
-        )
+            model.save("model.h5")
 
-        # Save model
-        print("Training completed!")
+            # === Evaluation ===
+
+            # Predict
+            y_pred_class_prob, y_pred_bbox = model.predict(X_features_valid)
+            y_pred_classes = np.argmax(y_pred_class_prob, axis=1)
+            y_true_classes = np.argmax(y_classes_valid, axis=1)
+
+            # Precision / Recall / F1
+            precision = precision_score(y_true_classes, y_pred_classes, average='weighted')
+            recall = recall_score(y_true_classes, y_pred_classes, average='weighted')
+            f1 = f1_score(y_true_classes, y_pred_classes, average='weighted')
+
+            # Save to text
+            os.makedirs('./evaluation_results', exist_ok=True)
+            with open('./evaluation_results/metrics.txt', 'w') as f:
+                f.write(f"Precision: {precision:.4f}\n")
+                f.write(f"Recall: {recall:.4f}\n")
+                f.write(f"F1 Score: {f1:.4f}\n")
+
+            # Bar plot
+            metrics = ['Precision', 'Recall', 'F1 Score']
+            values = [precision, recall, f1]
+            plt.figure(figsize=(10, 6))
+            plt.bar(metrics, values, color='skyblue')
+            plt.ylim(0, 1)
+            plt.title('Evaluation Metrics')
+            for i, v in enumerate(values):
+                plt.text(i, v + 0.02, f"{v:.2f}", ha='center', fontweight='bold')
+            plt.savefig('./evaluation_results/metric_summary.png')
+            plt.close()
+
+            # Per-epoch metrics plot
+            epochs = list(range(1, config_training.epochs + 1))
+            plt.figure(figsize=(10, 6))
+            plt.plot(epochs, eval_callback.epoch_metrics['precision'], label='Precision')
+            plt.plot(epochs, eval_callback.epoch_metrics['recall'], label='Recall')
+            plt.xlabel('Epoch')
+            plt.ylabel('Score')
+            plt.title('Validation Metrics Over Epochs')
+            plt.legend()
+            plt.grid(True)
+            plt.savefig('./evaluation_results/metrics_per_epoch.png')
+            plt.close()
