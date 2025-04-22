@@ -37,66 +37,31 @@ class UseModel:
         return (n_features, 1)  # If no better match found, use (n_features, 1)
 
     def use_ml(self, img_bytes: bytes):
-        # Load the model
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pkl") as temp_model:
             temp_model.write(self.model_bytes)
             model_path = temp_model.name
-        
+
         self.loaded_model = joblib.load(model_path)
         self.n_features = self.loaded_model.n_features_in_
         self.is_grayscale = self.detect_grayscale_model()
-        
-        # Open and convert the image
+
         image = Image.open(io.BytesIO(img_bytes))
         image = image.convert("L" if self.is_grayscale else "RGB")
-        
-        # Calculate the appropriate dimensions based on the model's expected features
-        if self.is_grayscale:
-            # For grayscale, n_features = width * height
-            width = height = int(np.sqrt(self.n_features))
-            # Adjust if perfect square isn't possible
-            while width * height != self.n_features:
-                width += 1
-                height = self.n_features // width
-                if width * height == self.n_features:
-                    break
-                width -= 2  # Try decreasing width
-                if width <= 0:
-                    raise ValueError(f"Cannot determine appropriate dimensions for {self.n_features} features")
-        else:
-            # For RGB, n_features = width * height * 3
-            width = height = int(np.sqrt(self.n_features // 3))
-            # Adjust if perfect dimensions aren't possible
-            while width * height * 3 != self.n_features:
-                width += 1
-                height = (self.n_features // 3) // width
-                if width * height * 3 == self.n_features:
-                    break
-                width -= 2  # Try decreasing width
-                if width <= 0:
-                    raise ValueError(f"Cannot determine appropriate dimensions for {self.n_features} features")
-        
-        # Resize the image to match the expected dimensions
+
+        height, width = self.find_optimal_shape(self.n_features)
         image = image.resize((width, height))
-        
-        # Process the image into the right format
         img_array = np.array(image).astype(np.float32) / 255.0
-        
         if self.is_grayscale:
             img_array = img_array.flatten().reshape(1, -1)
         else:
             img_array = img_array.reshape(1, -1)
-        
-        # Verify the dimensions match
+
         if img_array.shape[1] != self.n_features:
-            raise ValueError(f"Resized image has {img_array.shape[1]} features, but model expects {self.n_features}.")
-        
-        # Clean up temporary file
-        os.unlink(model_path)
-        
-        # Make prediction
+            raise ValueError(
+                f"Resized image has {img_array.shape[1]} features, but model expects {self.n_features}.")
+
         return self.loaded_model.predict(img_array)
-    
+
     def preprocess_image(self, image_bytes, input_shape):
         # Convert bytes to image
         image = Image.open(BytesIO(image_bytes))
@@ -234,7 +199,7 @@ class UseModel:
             class_id = int(class_probs.argmax())
             confidence = float(class_probs[class_id])
 
-            if confidence < 0.1:
+            if confidence < 0.5:
                 continue  # skip low-confidence detections
 
             # Get bounding box data
