@@ -248,11 +248,6 @@ class MLTraining():
         # Save the model
         joblib.dump(model, "ml_model.pkl")
 
-        # Evaluate on validation data
-        y_val_pred = model.predict(X_val)
-        val_accuracy = accuracy_score(y_val, y_val_pred)
-        print(f"Validation Accuracy: {val_accuracy}")
-
         # Create output directory
         os.makedirs("evaluation_results", exist_ok=True)
 
@@ -501,6 +496,8 @@ class DLTrainingPretrained():
             'dataset/train')
         X_val, y_val, _, _ = self.load_dataset_dl(
             'dataset/valid')
+        X_test, y_test, _, _ = self.load_dataset_dl(
+            'dataset/test', class_dict)
         num_classes = len(class_dict)
 
         # Create model
@@ -540,9 +537,9 @@ class DLTrainingPretrained():
         model.save("model.h5")
 
         # Evaluate on validation set
-        y_pred_probs = model.predict(X_val)
+        y_pred_probs = model.predict(X_test)
         y_pred = y_pred_probs.argmax(axis=1)
-        y_true = y_val.argmax(axis=1)
+        y_true = y_test.argmax(axis=1)
 
         # Metrics
         acc = accuracy_score(y_true, y_pred)
@@ -741,6 +738,8 @@ class ConstructTraining():
             'dataset/train')
         X_val, y_val, _, _ = self.load_dataset_cls(
             'dataset/valid', class_dict)
+        X_test, y_test, _, _ = self.load_dataset_cls(
+            'dataset/test', class_dict)
 
         print("Input Shape", input_shape)
         print("Class Dict", class_dict)
@@ -780,9 +779,9 @@ class ConstructTraining():
         model.save("model.h5")
 
         # Evaluate on validation set
-        y_pred_probs = model.predict(X_val)
+        y_pred_probs = model.predict(X_test)
         y_pred = y_pred_probs.argmax(axis=1)
-        y_true = y_val.argmax(axis=1)
+        y_true = y_test.argmax(axis=1)
 
         # Metrics
         acc = accuracy_score(y_true, y_pred)
@@ -906,6 +905,8 @@ class ConstructTraining():
             'dataset/train', hog_min, sift_min, orb_min, hog_params, sift_params, orb_params)
         X_val, y_val = MLTraining().load_dataset_featex(
             'dataset/valid', hog_min, sift_min, orb_min, hog_params, sift_params, orb_params)
+        X_test, y_test = MLTraining().load_dataset_featex(
+            'dataset/test', hog_min, sift_min, orb_min, hog_params, sift_params, orb_params)
 
         # Encode labels
         encoder = LabelEncoder()
@@ -957,10 +958,10 @@ class ConstructTraining():
         model.save("model.h5")
 
         # Evaluate
-        y_pred_probs = model.predict(X_val)
+        y_pred_probs = model.predict(X_test)
         y_pred = y_pred_probs.argmax(axis=1)
 
-        y_val_classes = y_val.argmax(axis=1)
+        y_val_classes = y_test.argmax(axis=1)
 
         acc = accuracy_score(y_val_classes, y_pred)
         precision = precision_score(y_val_classes, y_pred, average='macro')
@@ -1209,6 +1210,8 @@ class ConstructTraining():
             './dataset/train', (input_shape[1], input_shape[0]), num_classes, max_boxes)
         X_valid, y_bboxes_valid, y_classes_valid = self.load_dataset(
             './dataset/valid', (input_shape[1], input_shape[0]), num_classes, max_boxes)
+        X_test, y_bboxes_test, y_classes_test = self.load_dataset(
+            './dataset/test', (input_shape[1], input_shape[0]), num_classes, max_boxes)
 
         print("X_train:", X_train.shape)
         print("y_bboxes_train:", y_bboxes_train.shape)
@@ -1230,17 +1233,14 @@ class ConstructTraining():
 
         model.save("model.h5")
 
-        X_test, y_bboxes_true, y_classes_true = self.load_dataset('./dataset/test', (input_shape[1], input_shape[0]), num_classes, max_boxes)
-
-
         preds = model.predict(X_test)
         y_bboxes_pred = preds[0]
         y_classes_pred = preds[1]
 
-        y_true_classes_flat = np.argmax(y_classes_true.reshape(-1, y_classes_true.shape[-1]), axis=1)
+        y_true_classes_flat = np.argmax(y_classes_test.reshape(-1, y_classes_test.shape[-1]), axis=1)
         y_pred_classes_flat = np.argmax(y_classes_pred.reshape(-1, y_classes_pred.shape[-1]), axis=1)
 
-        mask_true = np.sum(y_classes_true, axis=-1).flatten() > 0
+        mask_true = np.sum(y_classes_test, axis=-1).flatten() > 0
         mask_pred = np.sum(y_classes_pred, axis=-1).flatten() > 0
 
         precision = precision_score(y_true_classes_flat[mask_true], y_pred_classes_flat[mask_true], average='macro', zero_division=0)
@@ -1253,10 +1253,10 @@ class ConstructTraining():
         ious = []
         average_precisions = []
         for i in range(len(X_test)):
-            true_boxes = y_bboxes_true[i]
+            true_boxes = y_bboxes_test[i]
             pred_boxes = y_bboxes_pred[i]
             for j in range(len(true_boxes)):
-                if np.sum(y_classes_true[i][j]) > 0:
+                if np.sum(y_classes_test[i][j]) > 0:
                     best_iou = 0
                     for k in range(len(pred_boxes)):
                         if np.sum(y_classes_pred[i][k]) > 0:
@@ -1267,6 +1267,13 @@ class ConstructTraining():
 
         mean_iou = np.mean(ious) if ious else 0
         map_50 = np.mean(average_precisions) if average_precisions else 0
+
+        print("\n📊 Evaluation Metrics:")
+        print(f"Precision: {precision:.4f}")
+        print(f"Recall:    {recall:.4f}")
+        print(f"F1 Score:  {f1:.4f}")
+        print(f"IoU: {mean_iou:.4f}")
+        print(f"mAP@0.5: {map_50:.4f}")
 
         os.makedirs('./evaluation_results', exist_ok=True)
         with open('./evaluation_results/metrics.txt', 'w') as f:
@@ -1437,9 +1444,11 @@ class ConstructTraining():
             # --- Feature count ---
             hog_min_train, sift_min_train, orb_min_train = self.check_min_feat_od('dataset/train', hog_params, sift_params, orb_params)
             hog_min_val, sift_min_val, orb_min_val = self.check_min_feat_od('dataset/valid', hog_params, sift_params, orb_params)
-            hog_min = min(hog_min_train, hog_min_val)
-            sift_min = min(sift_min_train, sift_min_val)
-            orb_min = min(orb_min_train, orb_min_val)
+            hog_min_test, sift_min_test, orb_min_test = self.check_min_feat_od('dataset/test', hog_params, sift_params, orb_params)
+            hog_min = min(hog_min_train, hog_min_val, hog_min_test)
+            sift_min = min(sift_min_train, sift_min_val, sift_min_test)
+            orb_min = min(orb_min_train, orb_min_val, orb_min_test)
+            print("MIN FEAT", hog_min, sift_min, orb_min)
 
             # --- Load data ---
             train_img_files, train_ann_files = self.get_image_paths("dataset/train")
@@ -1449,6 +1458,10 @@ class ConstructTraining():
             valid_img_files, valid_ann_files = self.get_image_paths("dataset/valid")
             X_features_valid, y_boxes_valid, y_classes_valid = self.load_data_od_featex(
                 "dataset/valid", valid_img_files, valid_ann_files, img_size, hog_params, hog_min, sift_params, sift_min, orb_params, orb_min)
+            
+            test_img_files, test_ann_files = self.get_image_paths("dataset/test")
+            X_features_test, y_boxes_test, y_classes_test = self.load_data_od_featex(
+                "dataset/test", test_img_files, test_ann_files, img_size, hog_params, hog_min, sift_params, sift_min, orb_params, orb_min)
 
             y_classes_train = np.array(y_classes_train)
             y_classes_valid = np.array(y_classes_valid)
@@ -1501,14 +1514,26 @@ class ConstructTraining():
             # === Evaluation ===
 
             # Predict
-            y_pred_class_prob, y_pred_bbox = model.predict(X_features_valid)
+            y_pred_class_prob, y_pred_bbox = model.predict(X_features_test)
+
+            # Fix for y_classes_test shape
+            y_classes_test = np.array(y_classes_test)
+            if y_classes_test.ndim > 1:
+                y_true_classes = np.argmax(y_classes_test, axis=1)
+            else:
+                y_true_classes = y_classes_test
+
             y_pred_classes = np.argmax(y_pred_class_prob, axis=1)
-            y_true_classes = np.argmax(y_classes_valid, axis=1)
 
             # Precision / Recall / F1
             precision = precision_score(y_true_classes, y_pred_classes, average='weighted')
             recall = recall_score(y_true_classes, y_pred_classes, average='weighted')
             f1 = f1_score(y_true_classes, y_pred_classes, average='weighted')
+
+            print("\n📊 Evaluation Metrics:")
+            print(f"Precision: {precision:.4f}")
+            print(f"Recall:    {recall:.4f}")
+            print(f"F1 Score:  {f1:.4f}")
 
             # Save to text
             os.makedirs('./evaluation_results', exist_ok=True)
