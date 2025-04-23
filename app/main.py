@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Form, File, UploadFile, HTTPException
+from fastapi.responses import PlainTextResponse
 import os
 import glob
 import subprocess
@@ -18,6 +19,7 @@ from app.models.dataset import DatasetConfigRequest, PrepareDatasetRequest
 from app.models.use_model import UseModelRequest
 from app.services.model.use_model import UseModel
 from app.helpers.models import delete_all_models, get_model
+from app.helpers.evaluation import get_evaluation, clear_evaluate_folder
 
 ml_training = MLTraining()
 dl_training_pretrained = DLTrainingPretrained()
@@ -82,6 +84,7 @@ async def create_venv():
 
 @app.post("/training-yolo-pt")
 async def training_yolo_pretrained(config: DeepLearningYoloRequest):
+    # TODO: อย่าลืมเพิ่มถ้า error ให้ลบโฟลเดอร์ทั้งหมดก่อนด้วย กันเหนียว
     dl_training_pretrained.train_yolo(config)
     if config.type == "object_detection":
         return get_model("od", "pt", config.model)
@@ -169,3 +172,10 @@ async def use_all_model(
         return {"prediction": prediction}
 
     raise HTTPException(400, "Invalid Model Type")
+
+@app.get("/evaluation")
+async def get_evaluation_result(workflow: str, yolo: str | None = None):
+    evaluation = get_evaluation(workflow, yolo)
+    delete_all_models()
+    clear_evaluate_folder()
+    return PlainTextResponse(evaluation, 200)

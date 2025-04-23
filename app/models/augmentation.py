@@ -29,6 +29,6 @@ class DataAugmentationConfig(BaseModel):
         Literal[
             'grayscale', 'resize', 'crop', 'rotate', 'flip', 'translate', 'scale', 'brightness', 'contrast_stretching',
             'histogram_equalization', 'adaptive_equalization','saturation', 'hue', 'gamma', 'gaussian_blur', 'motion_blur',
-            'zoom_blur','sharpening', 'gaussian_noise','salt_pepper_noise', 'random_erasing', 'elastic_distortion'
+            'zoom_blur','sharpening', 'gaussian_noise','salt_pepper_noise', 'random_erasing', 'elastic_distortion', 'number'
         ]
     ]
