@@ -501,7 +501,7 @@ class DLTrainingPretrained():
         num_classes = len(class_dict)
 
         # Create model
-        model = dlmodel.create_dl_model(config.model, num_classes, input_shape)
+        model = dlmodel.create_dl_model(config.model, num_classes, input_shape,unfreeze=5)
 
         # Unpack training configuration
         config_training = config.training
