@@ -500,11 +500,11 @@ class DLTrainingPretrained():
             'dataset/test', class_dict)
         num_classes = len(class_dict)
 
-        # Create model
-        model = dlmodel.create_dl_model(config.model, num_classes, input_shape,unfreeze=5)
-
         # Unpack training configuration
         config_training = config.training
+
+        # Create model
+        model = dlmodel.create_dl_model(config.model, num_classes, input_shape, config_training.unfreeze)
 
         # Convert string to loss function
         loss_function = get_loss(config_training.loss_function)

@@ -30,6 +30,7 @@ class ClassificationTrainingConfig(BaseModel):
     batch_size: int = 32
     epochs: int = 10
     loss_function: Literal['categorical_crossentropy'] = 'categorical_crossentropy'
+    unfreeze: int = 0
 
 
 class ObjectDetectionTrainingConfig(BaseModel):
