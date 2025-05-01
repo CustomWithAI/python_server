@@ -28,6 +28,7 @@ import os
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 import seaborn as sns
+from pathlib import Path
 
 from app.services.model.ml import MlModel
 from app.services.model.dl_pretrained import DlModel
@@ -410,8 +411,7 @@ class DLTrainingPretrained():
             print("No image files found in the folder!")
             return None
 
-    def reformat_dataset(self, source_dir, target_dir):
-        # Define subdirectories in the source dataset and target format
+    def reformat_dataset(self, source_dir: str, target_dir: str):
         data_splits = ["train", "test", "valid"]
         subdirs = {"image": "images", "labels": "labels"}
 
@@ -421,10 +421,9 @@ class DLTrainingPretrained():
             if not os.path.exists(split_source_dir):
                 continue
             for subdir in subdirs.values():
-                os.makedirs(os.path.join(
-                    target_dir, split, subdir), exist_ok=True)
+                os.makedirs(os.path.join(target_dir, split, subdir), exist_ok=True)
 
-        # Organize files into the target directory structure
+        # Organize files safely into target directory
         for split in data_splits:
             split_source_dir = os.path.join(source_dir, split)
             if not os.path.exists(split_source_dir):
@@ -441,11 +440,16 @@ class DLTrainingPretrained():
                 else:
                     continue
 
-                target_file = os.path.join(
-                    split_target_dir, target_subdir, file)
-                shutil.copy2(source_file, target_file)
+                target_file = os.path.join(split_target_dir, target_subdir, file)
 
-        print("Dataset has been reformatted and cloned to:", target_dir)
+                try:
+                    Path(target_file).parent.mkdir(parents=True, exist_ok=True)
+                    with open(source_file, 'rb') as src, open(target_file, 'wb') as dst:
+                        shutil.copyfileobj(src, dst)
+                except Exception as e:
+                    print(f"Error copying {source_file} to {target_file}: {e}")
+
+        print("✅ Dataset has been reformatted and copied to:", target_dir)
 
     def train_yolo(self, config: DeepLearningYoloRequest):
         # Clone dataset to the training folder

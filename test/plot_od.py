@@ -2,60 +2,9 @@ import cv2
 import json
 
 # Example image path and JSON data
-image_path = './test.jpg'
+image_path = './dog_and_cat.jpg'
 detection_output = {
-    "prediction": [
-        {
-            "class_id": 0,
-            "bbox": {
-                "x_center": 0.01852455735206604,
-                "y_center": 0.13786430656909943,
-                "width": 0.057493265718221664,
-                "height": 0.17428430914878845
-            },
-            "confidence": 0.27002599835395813
-        },
-        {
-            "class_id": 1,
-            "bbox": {
-                "x_center": 0.02155199646949768,
-                "y_center": 0.05633934587240219,
-                "width": 0.014412987977266312,
-                "height": 0.1020975187420845
-            },
-            "confidence": 0.2701541781425476
-        },
-        {
-            "class_id": 2,
-            "bbox": {
-                "x_center": 0.08580442517995834,
-                "y_center": 0.08008135855197906,
-                "width": 0.11641693860292435,
-                "height": 0.16579416394233704
-            },
-            "confidence": 0.26923900842666626
-        },
-        {
-            "class_id": 3,
-            "bbox": {
-                "x_center": 0.054593276232481,
-                "y_center": 0.1736900955438614,
-                "width": 0.0437728613615036,
-                "height": 0.17468994855880737
-            },
-            "confidence": 0.27083590626716614
-        },
-        {
-            "class_id": 4,
-            "bbox": {
-                "x_center": 0.08583462983369827,
-                "y_center": 0.07386838644742966,
-                "width": 0.02716866508126259,
-                "height": 0.0804717019200325
-            },
-            "confidence": 0.27024248242378235
-        }
-    ]
+    "prediction": [{'class_id': 1, 'bbox': {'x_center': 0.799643, 'y_center': 0.334123, 'width': 0.399594, 'height': 0.309747}, 'confidence': 0.6}, {'class_id': 0, 'bbox': {'x_center': 0.438757, 'y_center': 0.520915, 'width': 0.210493, 'height': 0.242521}, 'confidence': 0.8}]
 }
 
 # Load image

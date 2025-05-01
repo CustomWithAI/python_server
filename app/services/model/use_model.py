@@ -12,6 +12,7 @@ import tempfile
 from pathlib import Path
 import os
 import shutil
+from app.services.dataset.dataset import reverse_convert_object_detection, reverse_convert_segmentation
 
 
 class UseModel:
@@ -105,7 +106,7 @@ class UseModel:
         predictions = self.model.predict(processed_img)
         return np.argmax(predictions, axis=1)[0]
 
-    def use_dl_od_pt(self, img_bytes, version):
+    def use_dl_od_pt(self, img_bytes: bytes, version):
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as temp_model:
             temp_model.write(self.model_bytes)
             model_path = temp_model.name
@@ -163,8 +164,13 @@ class UseModel:
 
         shutil.rmtree("./app/services/model/yolov5/runs/detect/exp", ignore_errors=True)
         shutil.rmtree("./runs/detect/predict2", ignore_errors=True)
+        
+        image = Image.open(io.BytesIO(img_bytes))
+        img_width, img_height = image.size
+        image.close()
 
-        return detections
+        return reverse_convert_object_detection(detections, img_width, img_height)
+
     def use_dl_od_con(self, img_bytes: bytes):
         print(f"Image bytes length: {len(img_bytes)}")
         with tempfile.NamedTemporaryFile(delete=False, suffix=".h5") as temp_model:
@@ -216,7 +222,11 @@ class UseModel:
                 "confidence": confidence
             })
 
-        return detections
+        image = Image.open(io.BytesIO(img_bytes))
+        img_width, img_height = image.size
+        image.close()
+
+        return reverse_convert_object_detection(detections, img_width, img_height)
 
     def use_dl_seg(self, img_bytes: bytes, version: str):
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as temp_model:
@@ -245,7 +255,7 @@ class UseModel:
         else:
             raise HTTPException(400, f"Unsupported version: {version}")
 
-        folder_path = "./runs/segment/predict/labels/"
+        folder_path = "./runs/segment/predict2/labels/"
         subprocess.run(command, shell=True, check=True)
 
         detections = []
@@ -260,6 +270,10 @@ class UseModel:
                         polygon = [(coordinates[i], coordinates[i+1]) for i in range(0, len(coordinates), 2)]
                         detections.append({"class_id": class_id, "polygon": polygon})
 
-        shutil.rmtree("./runs/segment/predict", ignore_errors=True)
+        shutil.rmtree("./runs/segment/", ignore_errors=True)
+        
+        image = Image.open(io.BytesIO(img_bytes))
+        img_width, img_height = image.size
+        image.close()
 
-        return detections
+        return reverse_convert_segmentation(detections, img_width, img_height)

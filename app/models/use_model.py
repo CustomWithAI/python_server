@@ -4,6 +4,8 @@ from typing import Literal, Optional
 
 class UseModelRequest(BaseModel):
     type: Literal['ml', 'dl_cls', 'dl_od_pt', 'dl_od_con', 'dl_seg']
+    img: str
+    model: str
     version: Optional[Literal["yolov5", "yolov8", "yolov11"]] = None
     
     @model_validator(mode="after")

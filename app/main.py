@@ -1,10 +1,10 @@
-from fastapi import FastAPI, Form, File, UploadFile, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import PlainTextResponse, JSONResponse
 import os
 import glob
 import subprocess
+import requests
 
-from typing import Annotated
 from app.services.dataset.dataset import preprocess_all_dataset, augment_dataset_class, augment_dataset_obj, augment_dataset_seg, prepare_dataset
 from app.services.model.training import MLTraining, DLTrainingPretrained, ConstructTraining
 from app.models.ml import MachineLearningClassificationRequest
@@ -26,6 +26,15 @@ dl_training_pretrained = DLTrainingPretrained()
 construct_training = ConstructTraining()
 
 app = FastAPI()
+
+@app.exception_handler(Exception)
+async def exception_handler(request: Request, e: Exception):
+    delete_all_models()
+    clear_evaluate_folder()
+    return JSONResponse(
+        status_code=500,
+        content={"message": f"Error: {str(e)}", "path": f"{request.url}"}
+    )
 
 
 @app.get("/")
@@ -84,7 +93,6 @@ async def create_venv():
 
 @app.post("/training-yolo-pt")
 async def training_yolo_pretrained(config: DeepLearningYoloRequest):
-    # TODO: อย่าลืมเพิ่มถ้า error ให้ลบโฟลเดอร์ทั้งหมดก่อนด้วย กันเหนียว
     dl_training_pretrained.train_yolo(config)
     if config.type == "object_detection":
         return get_model("od", "pt", config.model)
@@ -139,21 +147,28 @@ async def config_dataset(config: DatasetConfigRequest):
 
 
 @app.post("/use-model")
-async def use_all_model(
-    type: Annotated[str, Form(...)],
-    img: UploadFile = File(...),
-    model: UploadFile = File(...),
-    version: str | None = Form(None),
-):
-    payload = UseModelRequest(type=type, version=version)
-    image_bytes = await img.read()
-    model_bytes = await model.read()
+async def use_all_model(payload: UseModelRequest):
+    
+    image_bytes: bytes
+    model_bytes: bytes
+    
+    response = requests.get(payload.img, stream=True)
+    if (response.status_code == 200):
+        image_bytes = response.content
+    else:
+        raise HTTPException(400, "Can't download image")
+    
+    response = requests.get(payload.model, stream=True)
+    if (response.status_code == 200):
+        model_bytes = response.content
+    else:
+        raise HTTPException(400, "Can't download model")
 
     use_model = UseModel(model_bytes=model_bytes)
 
     if payload.type == "ml":
         prediction = use_model.use_ml(image_bytes)
-        return {"prediction": prediction.tolist()}
+        return {"prediction": prediction.tolist()[0]}
 
     if payload.type == "dl_cls":
         prediction = use_model.use_dl_cls(image_bytes)

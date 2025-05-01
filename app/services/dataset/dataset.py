@@ -7,13 +7,19 @@ import shutil
 from PIL import Image
 from urllib.parse import urlparse
 from io import BytesIO
-from typing import List, Dict
+from typing import List
 from collections import defaultdict
 from app.services.dataset.preprocessing import Preprocessing
 from app.services.dataset.augmentation import Augmentation
 from app.models.preprocessing import ImagePreprocessingConfig
 from app.models.augmentation import DataAugmentationConfig
-from app.models.dataset import PrepareDatasetRequest, ObjectDetectionPlot, SegmentationPlot
+from app.models.dataset import (
+    PrepareDatasetRequest,
+    ObjectDetectionPlot,
+    SegmentationPlot,
+    ObjectDetectionPredict,
+    SegmentationPredict,
+)
 
 preprocess = Preprocessing()
 augmentation = Augmentation()
@@ -224,6 +230,9 @@ def augment_dataset_seg(folder_path: str, config_augmentation: DataAugmentationC
 def normalize(value: int, max_value: int) -> float:
     return value / max_value
 
+def reverse_normalize(value: float, max_value: int) -> float:
+    return value * max_value
+
 def convert_object_detection(annotation: List[ObjectDetectionPlot], labels: List[str], img_width: int, img_height: int) -> str:
     result = []
     for obj in annotation:
@@ -235,15 +244,65 @@ def convert_object_detection(annotation: List[ObjectDetectionPlot], labels: List
         result.append(f"{class_idx} {x_center} {y_center} {width_norm} {height_norm}")
     return "\n".join(result)
 
+def reverse_convert_object_detection(annotation: List[ObjectDetectionPredict], img_width: int, img_height: int):
+    result = []
+    for obj in annotation:
+        bbox = obj.get("bbox")
+        
+        if not bbox:
+            continue
+
+        x_center = reverse_normalize(bbox.get("x_center", 0), img_width)
+        y_center = reverse_normalize(bbox.get("y_center", 0), img_height)
+        width = reverse_normalize(bbox.get("width", 0), img_width)
+        height = reverse_normalize(bbox.get("height", 0), img_height)
+        
+        x = x_center - width / 2
+        y = y_center - height / 2
+        
+        data = {
+            "x": x,
+            "y": y,
+            "width": width,
+            "height": height,
+            "label": obj.get("class_id"),
+        }
+        
+        if "confidence" in obj:
+            data["confidence"] = obj["confidence"]
+        
+        result.append(data)
+    return result
+
 def convert_segmentation(annotation: List[SegmentationPlot], labels: List[str], img_width: int, img_height: int) -> str:
     result = []
     for obj in annotation:
         class_idx = labels.index(obj.label)
         points = [(normalize(p.x, img_width), normalize(p.y, img_height)) for p in obj.points]
-        points.append(points[0])  # ปิด polygon
+        points.append(points[0])
         point_str = " ".join(f"{x} {y}" for x, y in points)
         result.append(f"{class_idx} {point_str}")
     return "\n".join(result)
+
+def reverse_convert_segmentation(annotation: List[SegmentationPredict], img_width: int, img_height: int):
+    result = []
+    for obj in annotation:
+        points = [
+            {
+                "x": reverse_normalize(p[0], img_width),
+                "y": reverse_normalize(p[1], img_height)
+            }
+            for p in obj.get("polygon")
+        ]
+        
+        data = {
+            "label": obj.get("class_id"),
+            "points": [{"x": p.get("x"), "y": p.get("y")}for p in points]
+        }
+        
+        result.append(data)
+    
+    return result
 
 def prepare_dataset(request: PrepareDatasetRequest):
     base_dir = "dataset"

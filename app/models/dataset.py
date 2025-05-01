@@ -1,5 +1,5 @@
 from pydantic import BaseModel, model_validator
-from typing import Literal, Optional, List, Union
+from typing import Literal, Optional, List, Union, TypedDict, Tuple
 
 from app.models.preprocessing import ImagePreprocessingConfig
 from app.models.augmentation import DataAugmentationConfig
@@ -77,3 +77,18 @@ class DatasetConfigRequest(BaseModel):
         if values.augmentation and not values.type:
             raise ValueError("Augmentation requires dataset type.")
         return values
+
+class ObjectDetectionBoundingBox(TypedDict):
+    x_center: float
+    y_center: float
+    width: float
+    height: float
+
+class ObjectDetectionPredict(TypedDict):
+    class_id: int
+    bbox: ObjectDetectionBoundingBox
+    confidence: Optional[float]
+
+class SegmentationPredict(TypedDict):
+    class_id: int
+    polygon: List[Tuple[float, float]]
