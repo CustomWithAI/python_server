@@ -1,0 +1,156 @@
+
+100 epochs completed in 0.320 hours.
+Optimizer stripped from runs/train/exp4/weights/last.pt, 14.2MB
+Optimizer stripped from runs/train/exp4/weights/best.pt, 14.2MB
+
+Validating runs/train/exp4/weights/best.pt...
+Fusing layers... 
+Model summary: 157 layers, 7015519 parameters, 0 gradients, 15.8 GFLOPs
+                 Class     Images  Instances          P          R      mAP50   mAP50-95: 100% 6/6 [00:05<00:00,  1.11it/s]
+                   all        737        737      0.977      0.957      0.982      0.775
+                   cat        737        240      0.986      0.958      0.986      0.822
+                   dog        737        497      0.969      0.956      0.979      0.729
+Results saved to runs/train/exp4
+COMET INFO: ---------------------------------------------------------------------------------------
+COMET INFO: Comet.ml OfflineExperiment Summary
+COMET INFO: ---------------------------------------------------------------------------------------
+COMET INFO:   Data:
+COMET INFO:     display_summary_level : 1
+COMET INFO:     name                  : exp
+COMET INFO:     url                   : [OfflineExperiment will get URL after upload]
+COMET INFO:   Metrics [count] (min, max):
+COMET INFO:     loss [410]                 : (0.6009507179260254, 10.494542121887207)
+COMET INFO:     metrics/mAP_0.5 [200]      : (0.056588162060928204, 0.9874731289577015)
+COMET INFO:     metrics/mAP_0.5:0.95 [200] : (0.014894348314916608, 0.7757369428231199)
+COMET INFO:     metrics/precision [200]    : (0.08865831009174943, 0.9872119472327368)
+COMET INFO:     metrics/recall [200]       : (0.08853118712273642, 0.9651802780764048)
+COMET INFO:     train/box_loss [200]       : (0.019696539267897606, 0.10211554914712906)
+COMET INFO:     train/cls_loss [200]       : (0.0012327930890023708, 0.02650873363018036)
+COMET INFO:     train/obj_loss [200]       : (0.00639300188049674, 0.014405372552573681)
+COMET INFO:     val/box_loss [200]         : (0.019499115645885468, 0.07784431427717209)
+COMET INFO:     val/cls_loss [200]         : (0.0013626416912302375, 0.0280914306640625)
+COMET INFO:     val/obj_loss [200]         : (0.0025085448287427425, 0.0069205728359520435)
+COMET INFO:     x/lr0 [200]                : (0.0002980000000000002, 0.07073170731707318)
+COMET INFO:     x/lr1 [200]                : (0.0002980000000000002, 0.00972230894308943)
+COMET INFO:     x/lr2 [200]                : (0.0002980000000000002, 0.00972230894308943)
+COMET INFO:   Others:
+COMET INFO:     Name                        : exp
+COMET INFO:     comet_log_batch_metrics     : False
+COMET INFO:     comet_log_confusion_matrix  : True
+COMET INFO:     comet_log_per_class_metrics : False
+COMET INFO:     comet_max_image_uploads     : 100
+COMET INFO:     comet_mode                  : online
+COMET INFO:     comet_model_name            : yolov5
+COMET INFO:     hasNestedParams             : True
+COMET INFO:     offline_experiment          : True
+COMET INFO:   Parameters:
+COMET INFO:     anchor_t            : 4.0
+COMET INFO:     artifact_alias      : latest
+COMET INFO:     batch_size          : 64
+COMET INFO:     bbox_interval       : -1
+COMET INFO:     box                 : 0.05
+COMET INFO:     bucket              : 
+COMET INFO:     cfg                 : 
+COMET INFO:     cls                 : 0.012500000000000002
+COMET INFO:     cls_pw              : 1.0
+COMET INFO:     copy_paste          : 0.0
+COMET INFO:     cos_lr              : False
+COMET INFO:     degrees             : 0.0
+COMET INFO:     device              : 
+COMET INFO:     entity              : None
+COMET INFO:     evolve              : None
+COMET INFO:     evolve_population   : data/hyps
+COMET INFO:     exist_ok            : False
+COMET INFO:     fl_gamma            : 0.0
+COMET INFO:     fliplr              : 0.5
+COMET INFO:     flipud              : 0.0
+COMET INFO:     freeze              : [0]
+COMET INFO:     hsv_h               : 0.015
+COMET INFO:     hsv_s               : 0.7
+COMET INFO:     hsv_v               : 0.4
+COMET INFO:     hyp|anchor_t        : 4.0
+COMET INFO:     hyp|box             : 0.05
+COMET INFO:     hyp|cls             : 0.5
+COMET INFO:     hyp|cls_pw          : 1.0
+COMET INFO:     hyp|copy_paste      : 0.0
+COMET INFO:     hyp|degrees         : 0.0
+COMET INFO:     hyp|fl_gamma        : 0.0
+COMET INFO:     hyp|fliplr          : 0.5
+COMET INFO:     hyp|flipud          : 0.0
+COMET INFO:     hyp|hsv_h           : 0.015
+COMET INFO:     hyp|hsv_s           : 0.7
+COMET INFO:     hyp|hsv_v           : 0.4
+COMET INFO:     hyp|iou_t           : 0.2
+COMET INFO:     hyp|lr0             : 0.01
+COMET INFO:     hyp|lrf             : 0.01
+COMET INFO:     hyp|mixup           : 0.0
+COMET INFO:     hyp|momentum        : 0.937
+COMET INFO:     hyp|mosaic          : 1.0
+COMET INFO:     hyp|obj             : 1.0
+COMET INFO:     hyp|obj_pw          : 1.0
+COMET INFO:     hyp|perspective     : 0.0
+COMET INFO:     hyp|scale           : 0.5
+COMET INFO:     hyp|shear           : 0.0
+COMET INFO:     hyp|translate       : 0.1
+COMET INFO:     hyp|warmup_bias_lr  : 0.1
+COMET INFO:     hyp|warmup_epochs   : 3.0
+COMET INFO:     hyp|warmup_momentum : 0.8
+COMET INFO:     hyp|weight_decay    : 0.0005
+COMET INFO:     image_weights       : False
+COMET INFO:     imgsz               : 100
+COMET INFO:     iou_t               : 0.2
+COMET INFO:     label_smoothing     : 0.0
+COMET INFO:     local_rank          : -1
+COMET INFO:     lr0                 : 0.01
+COMET INFO:     lrf                 : 0.01
+COMET INFO:     mixup               : 0.0
+COMET INFO:     momentum            : 0.937
+COMET INFO:     mosaic              : 1.0
+COMET INFO:     multi_scale         : False
+COMET INFO:     name                : exp
+COMET INFO:     ndjson_console      : False
+COMET INFO:     ndjson_file         : False
+COMET INFO:     noautoanchor        : False
+COMET INFO:     noplots             : False
+COMET INFO:     nosave              : False
+COMET INFO:     noval               : False
+COMET INFO:     obj                 : 0.04000000000000001
+COMET INFO:     obj_pw              : 1.0
+COMET INFO:     optimizer           : SGD
+COMET INFO:     patience            : 100
+COMET INFO:     perspective         : 0.0
+COMET INFO:     project             : runs/train
+COMET INFO:     quad                : False
+COMET INFO:     rect                : False
+COMET INFO:     resume              : False
+COMET INFO:     resume_evolve       : None
+COMET INFO:     save_dir            : runs/train/exp4
+COMET INFO:     save_period         : -1
+COMET INFO:     scale               : 0.5
+COMET INFO:     seed                : 0
+COMET INFO:     shear               : 0.0
+COMET INFO:     single_cls          : False
+COMET INFO:     sync_bn             : False
+COMET INFO:     translate           : 0.1
+COMET INFO:     upload_dataset      : False
+COMET INFO:     val_conf_threshold  : 0.001
+COMET INFO:     val_iou_threshold   : 0.6
+COMET INFO:     warmup_bias_lr      : 0.1
+COMET INFO:     warmup_epochs       : 3.0
+COMET INFO:     warmup_momentum     : 0.8
+COMET INFO:     weight_decay        : 0.0005
+COMET INFO:     workers             : 8
+COMET INFO:   Uploads:
+COMET INFO:     asset               : 13 (1.25 MB)
+COMET INFO:     confusion-matrix    : 1
+COMET INFO:     environment details : 1
+COMET INFO:     git metadata        : 1
+COMET INFO:     images              : 6
+COMET INFO:     installed packages  : 1
+COMET INFO:     model graph         : 1
+COMET INFO:     os packages         : 1
+COMET INFO: 
+COMET INFO: Still saving offline stats to messages file before program termination (may take up to 120 seconds)
+COMET INFO: Begin archiving the offline data.
+COMET INFO: To upload this offline experiment, run:
+    comet upload /content/yolov5/.cometml-runs/c6d23f8eb9154967a1432592ff939ea9.zip

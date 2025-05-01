@@ -1,0 +1,10 @@
+{
+  "model": {
+    "type": "svm",
+    "model": {
+      "kernel": "rbf",
+      "gamma": "scale",
+      "degree": 3
+    }
+  }
+}

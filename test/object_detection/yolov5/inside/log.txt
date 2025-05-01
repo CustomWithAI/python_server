@@ -1,0 +1,12 @@
+100 epochs completed in 2.514 hours.
+Optimizer stripped from app/services/model/yolov5/runs/train/exp7/weights/last.pt, 14.2MB
+Optimizer stripped from app/services/model/yolov5/runs/train/exp7/weights/best.pt, 14.2MB
+
+Validating app/services/model/yolov5/runs/train/exp7/weights/best.pt...
+Fusing layers... 
+Model summary: 157 layers, 7015519 parameters, 0 gradients, 15.8 GFLOPs
+                 Class     Images  Instances          P          R      mAP50   mAP50-95: 100%|██████████| 24/24 [00:05<00:00,  4.40it/s]
+                   all        737        737      0.981       0.96      0.982      0.777
+                   cat        737        240      0.987      0.975      0.989      0.826
+                   dog        737        497      0.976      0.946      0.976      0.727
+Results saved to app/services/model/yolov5/runs/train/exp7
