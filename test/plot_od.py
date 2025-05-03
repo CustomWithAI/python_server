@@ -2,9 +2,20 @@ import cv2
 import json
 
 # Example image path and JSON data
-image_path = './dog_and_cat.jpg'
+image_path = './Cats_Test0.png'
 detection_output = {
-    "prediction": [{'class_id': 1, 'bbox': {'x_center': 0.799643, 'y_center': 0.334123, 'width': 0.399594, 'height': 0.309747}, 'confidence': 0.6}, {'class_id': 0, 'bbox': {'x_center': 0.438757, 'y_center': 0.520915, 'width': 0.210493, 'height': 0.242521}, 'confidence': 0.8}]
+    "prediction": [
+        {
+            "class_id": 0,
+            "bbox": {
+                "x_center": 0.600858,
+                "y_center": 0.244286,
+                "width": 0.489270,
+                "height": 0.322857
+            },
+            "confidence": 0.27002599835395813
+        }
+    ]
 }
 
 # Load image
