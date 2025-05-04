@@ -16,6 +16,7 @@ from tensorflow.keras.datasets import cifar10
 from tensorflow.keras.optimizers import Adam, SGD
 from tensorflow.keras.losses import categorical_crossentropy
 from tensorflow.keras.callbacks import LearningRateScheduler
+from keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau, Callback
 from tensorflow.keras.losses import get as get_loss
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
@@ -526,13 +527,26 @@ class DLTrainingPretrained():
         model.compile(optimizer=optimizer, loss=loss_function,
                       metrics=['accuracy'])
 
-        # Learning rate scheduler (optional)
         callbacks = []
-        if config_training.learning_rate_scheduler:
-            def scheduler(epoch, lr):
-                return config_training.learning_rate_scheduler(epoch, lr)
-            callbacks.append(LearningRateScheduler(scheduler))
-
+        if config_training.callbacks == "reduce_lr_on_plateau":
+            callbacks.append(
+                ReduceLROnPlateau(
+                    monitor='val_loss',
+                    factor=0.5,          # Reduce by half
+                    patience=3,          # Wait for 3 epochs with no improvement
+                    min_lr=1e-6,         # Don't go below this
+                    verbose=1
+                )
+            )
+        elif config_training.callbacks == "early_stopping":
+            callbacks.append(
+                EarlyStopping(
+                    monitor='val_loss',
+                    patience=5,
+                    verbose=1,
+                    restore_best_weights=True
+                )
+            )
         # Train the model
         history = model.fit(X_train, y_train, validation_data=(
             X_val, y_val), epochs=config_training.epochs, batch_size=config_training.batch_size, callbacks=callbacks)
@@ -771,10 +785,25 @@ class ConstructTraining():
 
         # Callbacks
         callbacks = []
-        if config_training.learning_rate_scheduler:
-            def scheduler(epoch, lr):
-                return config_training.learning_rate_scheduler(epoch, lr)
-            callbacks.append(LearningRateScheduler(scheduler))
+        if config_training.callbacks == "reduce_lr_on_plateau":
+            callbacks.append(
+                ReduceLROnPlateau(
+                    monitor='val_loss',
+                    factor=0.5,          # Reduce by half
+                    patience=3,          # Wait for 3 epochs with no improvement
+                    min_lr=1e-6,         # Don't go below this
+                    verbose=1
+                )
+            )
+        elif config_training.callbacks == "early_stopping":
+            callbacks.append(
+                EarlyStopping(
+                    monitor='val_loss',
+                    patience=5,
+                    verbose=1,
+                    restore_best_weights=True
+                )
+            )
 
         # Train the model
         history = model.fit(X_train, y_train, validation_data=(
@@ -950,10 +979,25 @@ class ConstructTraining():
 
         # Callbacks
         callbacks = []
-        if config_training.learning_rate_scheduler:
-            def scheduler(epoch, lr):
-                return config_training.learning_rate_scheduler(epoch, lr)
-            callbacks.append(LearningRateScheduler(scheduler))
+        if config_training.callbacks == "reduce_lr_on_plateau":
+            callbacks.append(
+                ReduceLROnPlateau(
+                    monitor='val_loss',
+                    factor=0.5,          # Reduce by half
+                    patience=3,          # Wait for 3 epochs with no improvement
+                    min_lr=1e-6,         # Don't go below this
+                    verbose=1
+                )
+            )
+        elif config_training.callbacks == "early_stopping":
+            callbacks.append(
+                EarlyStopping(
+                    monitor='val_loss',
+                    patience=5,
+                    verbose=1,
+                    restore_best_weights=True
+                )
+            )
 
         # Train the model
         history = model.fit(X_train, y_train, validation_data=(
