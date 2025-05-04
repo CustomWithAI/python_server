@@ -72,20 +72,20 @@ class MLTraining():
                     try:
                         img = imread(img_path)
                         if img.ndim == 2:  # Grayscale image
-                            # Add channel dimension
                             img = np.expand_dims(img, axis=-1)
-                        # Color image
                         elif img.ndim == 3 and img.shape[2] == 3:
-                            pass  # Already has the correct shape
+                            pass
                         else:
-                            raise ValueError(
-                                f"Unsupported image dimensions: {img.shape}")
+                            raise ValueError(f"Unsupported image dimensions: {img.shape}")
+
+                        img = img.astype(np.float32) / 255.0  # Normalize to [0, 1]
 
                         if expected_shape is None:
                             expected_shape = img.shape
                         elif img.shape != expected_shape:
                             raise ValueError(
-                                f"Inconsistent shape for image {img_path}. Expected {expected_shape}, got {img.shape}")
+                                f"Inconsistent shape for image {img_path}. Expected {expected_shape}, got {img.shape}"
+                            )
 
                         img_flattened = img.flatten()
                         images.append(img_flattened)
@@ -332,8 +332,9 @@ class DLTrainingPretrained():
                         img_path = os.path.join(class_path, filename)
                         try:
                             # Load image
-                            img = load_img(img_path)
-                            img_array = img_to_array(img)
+                            img = load_img(img_path)  # Ensure consistent size
+                            img_array = img_to_array(img) / 255.0              # Normalize to [0,1]
+
 
                             # Set input shape based on the first image loaded
                             if input_shape is None:
@@ -722,8 +723,9 @@ class ConstructTraining():
                     if filename.lower().endswith(('png', 'jpg', 'jpeg')):
                         img_path = os.path.join(class_path, filename)
                         try:
-                            img = load_img(img_path)
-                            img_array = img_to_array(img)
+                            # Load image
+                            img = load_img(img_path)  # Ensure consistent size
+                            img_array = img_to_array(img) / 255.0              # Normalize to [0,1]
 
                             if input_shape is None:
                                 # Set input shape based on the first image

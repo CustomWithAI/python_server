@@ -1,5 +1,7 @@
 from tensorflow.keras import layers, Model
 from tensorflow.keras.applications import ResNet50, VGG16, MobileNetV2
+from tensorflow.keras import layers
+from tensorflow.keras.models import Model, Sequential
 
 class DlModel:
     def __init__(self):
@@ -30,12 +32,18 @@ class DlModel:
         for layer in base_model.layers[-num_to_unfreeze:]:
             layer.trainable = True
 
-        # Add custom classification head
-        x = base_model.output
-        x = layers.GlobalAveragePooling2D()(x)
-        x = layers.Dense(1024, activation='relu')(x)
-        x = layers.Dropout(0.5)(x)
-        predictions = layers.Dense(num_classes, activation='softmax')(x)
+        # Create a Sequential model with the custom head
+        model = Sequential([
+            base_model,  # Add the pre-trained base model
+            layers.GlobalAveragePooling2D(),  # Global average pooling
+            layers.Dense(512, activation='relu'),  # First dense layer
+            layers.BatchNormalization(),  # Batch normalization
+            layers.Dropout(0.3),  # Dropout layer
+            layers.Dense(128, activation='relu'),  # Second dense layer
+            layers.Dropout(0.1),  # Dropout layer
+            layers.Dense(32, activation='relu'),  # Third dense layer
+            layers.Dropout(0.3),  # Dropout layer
+            layers.Dense(num_classes, activation='softmax')  # Output layer
+        ])
 
-        model = Model(inputs=base_model.input, outputs=predictions)
         return model

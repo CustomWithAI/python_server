@@ -21,6 +21,19 @@ SegmentationWeightSizes = Literal[
     "yolo11s-seg.pt", "yolo11m-seg.pt", "yolo11l-seg.pt"
 ]
 
+class ReduceLrOnPlateau(BaseModel):
+    monitor: Literal['val_loss', 'loss', 'val_accuracy', 'accuracy', 'val_mean_squared_error', 'mean_absolute_error', 'val_mean_absolute_error'] = 'val_loss'
+    factor: float = 0.5
+    patience: int = 3
+    min_lr: float = 0.00001
+
+class EarlyStopping(BaseModel):
+    monitor: Literal['val_loss', 'loss', 'val_accuracy', 'accuracy', 'val_mean_squared_error', 'mean_absolute_error', 'val_mean_absolute_error'] = 'val_loss'
+    patience: float = 3
+
+class ClassificationCallbacks(BaseModel):
+    reduce_lr_on_plateau: Optional[ReduceLrOnPlateau] = None
+    early_stopping: Optional[EarlyStopping] = None
 
 class ClassificationTrainingConfig(BaseModel):
     learning_rate: float = 0.001
@@ -31,6 +44,7 @@ class ClassificationTrainingConfig(BaseModel):
     epochs: int = 10
     loss_function: Literal['categorical_crossentropy'] = 'categorical_crossentropy'
     unfreeze: int = 0
+    callbacks: Optional[ClassificationCallbacks] = None
 
 
 class ObjectDetectionTrainingConfig(BaseModel):
